@@ -58,6 +58,10 @@ class NFCReader(object):
 
     def run(self):
         """Starts the looping thread"""
+        import ipdb; ipdb.set_trace()
+        # break 119
+        # break 240
+        # break 208
         self.__context = ctypes.pointer(nfc.nfc_context())
         nfc.nfc_init(ctypes.byref(self.__context))
         loop = True
@@ -109,9 +113,13 @@ class NFCReader(object):
         if res < 0:
             raise IOError("NFC Error whilst polling")
         elif res >= 1:
+            print("_poll_loop: res = {}. nt.nti.nai.szUidLen = {}".format(res, nt.nti.nai.szUidLen))
             uid = None
-            if nt.nti.nai.szUidLen == 4:
-                uid = "".join([chr(nt.nti.nai.abtUid[i]) for i in range(4)])
+            uidLen = 7
+            if nt.nti.nai.szUidLen == uidLen:
+                # uid = "".join([chr(nt.nti.nai.abtUid[i]) for i in range(uidLen)])
+                uid = bytearray([nt.nti.nai.abtUid[i] for i in range(uidLen)])
+                print("_poll_loop: uid = {}".format(uid))
             if uid:
                 if not ((self._card_uid and self._card_present and uid == self._card_uid) and
                         time.mktime(time.gmtime()) <= self._card_last_seen + self.card_timeout):
@@ -135,8 +143,7 @@ class NFCReader(object):
         nt = nfc.nfc_target()
         _ = nfc.nfc_initiator_select_passive_target(
             self.__device, self.__modulations[0], None, 0, ctypes.byref(nt))
-        uid = "".join([chr(nt.nti.nai.abtUid[i])
-                       for i in range(nt.nti.nai.szUidLen)])
+        uid = bytearray([nt.nti.nai.abtUid[i] for i in range(nt.nti.nai.szUidLen)])
         return uid
 
     def _setup_device(self):
@@ -194,12 +201,13 @@ class NFCReader(object):
         abttx[0] = self.MC_AUTH_A if not use_b_key else self.MC_AUTH_B
         abttx[1] = block
         for i in range(6):
-            abttx[i + 2] = ord(key[i])
+            abttx[i + 2] = key[i]
         for i in range(4):
-            abttx[i + 8] = ord(uid[i])
+            abttx[i + 8] = uid[i]
         abtrx = (ctypes.c_uint8 * 250)()
-        return nfc.nfc_initiator_transceive_bytes(self.__device, ctypes.pointer(abttx), len(abttx),
+        transceived = nfc.nfc_initiator_transceive_bytes(self.__device, ctypes.pointer(abttx), len(abttx),
                                                   ctypes.pointer(abtrx), len(abtrx), 0)
+        return transceived
 
     def auth_and_read(self, block, uid, key="\xff\xff\xff\xff\xff\xff"):
         """Authenticates and then reads a block
@@ -207,7 +215,7 @@ class NFCReader(object):
            Returns '' if the authentication failed
         """
         # Reselect the card so that we can reauthenticate
-        self.select_card()
+        # self.select_card()
         res = self._authenticate(block, uid, key)
         if res >= 0:
             return self._read_block(block)
@@ -225,15 +233,19 @@ class NFCReader(object):
 
     def read_card(self, uid):
         """Takes a uid, reads the card and return data for use in writing the card"""
-        key = "\xff\xff\xff\xff\xff\xff"
-        print("Reading card", uid.encode("hex"))
+        key = bytearray([0xff] * 6)
+        # print("Reading card", uid.encode("hex"))
         self._card_uid = self.select_card()
         self._authenticate(0x00, uid, key)
         block = 0
+
+        all_data = []
         for block in range(64):
             data = self.auth_and_read(block, uid, key)
-            print(block, data.encode("hex"), "".join(
-                [x if x in string.printable else "." for x in data]))
+            # print(block, data.encode("hex"), "".join(
+            #     [x if x in string.printable else "." for x in data]))
+            all_data += [data]
+        print("read_card: '{}'".format(''.join(all_data)))
 
     def write_card(self, uid, data):
         """Accepts data of the recently read card with UID uid, and writes any changes necessary to it"""
