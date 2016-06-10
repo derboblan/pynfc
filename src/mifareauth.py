@@ -15,7 +15,8 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
 
 import time
 import logging
@@ -23,11 +24,14 @@ import ctypes
 import string
 import nfc
 
+
 def hex_dump(string):
     """Dumps data as hexstrings"""
     return ' '.join(["%0.2X" % ord(x) for x in string])
 
-### NFC device setup
+# NFC device setup
+
+
 class NFCReader(object):
     MC_AUTH_A = 0x60
     MC_AUTH_B = 0x61
@@ -60,7 +64,8 @@ class NFCReader(object):
         try:
             self._clean_card()
             conn_strings = (nfc.nfc_connstring * 10)()
-            devices_found = nfc.nfc_list_devices(self.__context, conn_strings, 10)
+            devices_found = nfc.nfc_list_devices(
+                self.__context, conn_strings, 10)
             if devices_found >= 1:
                 self.__device = nfc.nfc_open(self.__context, conn_strings[0])
                 try:
@@ -108,8 +113,8 @@ class NFCReader(object):
             if nt.nti.nai.szUidLen == 4:
                 uid = "".join([chr(nt.nti.nai.abtUid[i]) for i in range(4)])
             if uid:
-                if not ((self._card_uid and self._card_present and uid == self._card_uid) and \
-                                    time.mktime(time.gmtime()) <= self._card_last_seen + self.card_timeout):
+                if not ((self._card_uid and self._card_present and uid == self._card_uid) and
+                        time.mktime(time.gmtime()) <= self._card_last_seen + self.card_timeout):
                     self._setup_device()
                     self.read_card(uid)
             self._card_uid = uid
@@ -128,8 +133,10 @@ class NFCReader(object):
            Returns the UID of the card selected
         """
         nt = nfc.nfc_target()
-        _ = nfc.nfc_initiator_select_passive_target(self.__device, self.__modulations[0], None, 0, ctypes.byref(nt))
-        uid = "".join([chr(nt.nti.nai.abtUid[i]) for i in range(nt.nti.nai.szUidLen)])
+        _ = nfc.nfc_initiator_select_passive_target(
+            self.__device, self.__modulations[0], None, 0, ctypes.byref(nt))
+        uid = "".join([chr(nt.nti.nai.abtUid[i])
+                       for i in range(nt.nti.nai.szUidLen)])
         return uid
 
     def _setup_device(self):
@@ -168,7 +175,8 @@ class NFCReader(object):
         if nfc.nfc_device_set_property_bool(self.__device, nfc.NP_EASY_FRAMING, True) < 0:
             raise Exception("Error setting Easy Framing property")
         if len(data) > 16:
-            raise ValueError("Data value to be written cannot be more than 16 characters.")
+            raise ValueError(
+                "Data value to be written cannot be more than 16 characters.")
         abttx = (ctypes.c_uint8 * 18)()
         abttx[0] = self.MC_WRITE
         abttx[1] = block
@@ -178,7 +186,7 @@ class NFCReader(object):
         return nfc.nfc_initiator_transceive_bytes(self.__device, ctypes.pointer(abttx), len(abttx),
                                                   ctypes.pointer(abtrx), len(abtrx), 0)
 
-    def _authenticate(self, block, uid, key = "\xff\xff\xff\xff\xff\xff", use_b_key = False):
+    def _authenticate(self, block, uid, key="\xff\xff\xff\xff\xff\xff", use_b_key=False):
         """Authenticates to a particular block using a specified key"""
         if nfc.nfc_device_set_property_bool(self.__device, nfc.NP_EASY_FRAMING, True) < 0:
             raise Exception("Error setting Easy Framing property")
@@ -193,7 +201,7 @@ class NFCReader(object):
         return nfc.nfc_initiator_transceive_bytes(self.__device, ctypes.pointer(abttx), len(abttx),
                                                   ctypes.pointer(abtrx), len(abtrx), 0)
 
-    def auth_and_read(self, block, uid, key = "\xff\xff\xff\xff\xff\xff"):
+    def auth_and_read(self, block, uid, key="\xff\xff\xff\xff\xff\xff"):
         """Authenticates and then reads a block
 
            Returns '' if the authentication failed
@@ -205,7 +213,7 @@ class NFCReader(object):
             return self._read_block(block)
         return ''
 
-    def auth_and_write(self, block, uid, data, key = "\xff\xff\xff\xff\xff\xff"):
+    def auth_and_write(self, block, uid, data, key="\xff\xff\xff\xff\xff\xff"):
         """Authenticates and then writes a block
 
         """
@@ -224,7 +232,8 @@ class NFCReader(object):
         block = 0
         for block in range(64):
             data = self.auth_and_read(block, uid, key)
-            print(block, data.encode("hex"), "".join([ x if x in string.printable else "." for x in data]))
+            print(block, data.encode("hex"), "".join(
+                [x if x in string.printable else "." for x in data]))
 
     def write_card(self, uid, data):
         """Accepts data of the recently read card with UID uid, and writes any changes necessary to it"""
