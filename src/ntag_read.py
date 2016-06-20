@@ -75,3 +75,7 @@ for block in range(45):  # 45 pages in NTAG213
     #print("".join([chr(abtrx[i]) for i in range(res)]))
 
     print("{:3}: {}".format(block, binascii.hexlify(bytes(abtrx[:res]))))
+
+nfc.nfc_close(device)
+
+nfc.nfc_exit(context)
