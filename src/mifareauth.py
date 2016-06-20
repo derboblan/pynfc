@@ -23,6 +23,7 @@ import logging
 import ctypes
 import string
 import nfc
+import binascii
 
 
 def hex_dump(string):
@@ -58,7 +59,7 @@ class NFCReader(object):
 
     def run(self):
         """Starts the looping thread"""
-        import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
         # break 119
         # break 240
         # break 208
@@ -119,7 +120,7 @@ class NFCReader(object):
             if nt.nti.nai.szUidLen == uidLen:
                 # uid = "".join([chr(nt.nti.nai.abtUid[i]) for i in range(uidLen)])
                 uid = bytearray([nt.nti.nai.abtUid[i] for i in range(uidLen)])
-                print("_poll_loop: uid = {}".format(uid))
+                print("_poll_loop: uid = {}".format(binascii.hexlify(uid)))
             if uid:
                 if not ((self._card_uid and self._card_present and uid == self._card_uid) and
                         time.mktime(time.gmtime()) <= self._card_last_seen + self.card_timeout):
