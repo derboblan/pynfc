@@ -111,6 +111,39 @@ def read_print(device, page, length=4):
         data = data[:length] # Only the first $length bytes
     print("{:3}: {}".format(page, binascii.hexlify(data)))
 
+
+def write_block(device, block, data):
+    """Writes a block of data to an NTag
+    Raises an exception on error
+    """
+    set_easy_framing(True)
+
+    if len(data) > 16:
+        raise ValueError( "Data value to be written cannot be more than 16 bytes.")
+
+    abttx = bytearray(18) # 18 is 1 byte for command, 1 byte for block/page address, 16 for actual data
+    abttx[0] = MC_WRITE
+    abttx[1] = block
+    for index, byte in enumerate(data):
+    #     abttx[i + 2] = ord((data + "\x00" * (16 - len(data)))[i])
+        abttx[index + 2] = byte
+    # abtrx = (ctypes.c_uint8 * 250)()
+    # return nfc.nfc_initiator_transceive_bytes(self.__device, ctypes.pointer(abttx), len(abttx),
+    #                                           ctypes.pointer(abtrx), len(abtrx), 0)
+
+    recv = tranceive_bytes(device, bytes(abttx), 250)
+    return recv
+
+def write_page(device, page, data):
+    if len(data) > 4:
+        raise ValueError( "Data value to be written cannot be more than 4 bytes.")
+    return write_block(device, page, data)
+
+print("write: ", write_page(device, 5, bytes([0xff,0xff,0xff,0xff])))
+
+read_simple(45)
+
+
 nfc.nfc_close(device)
 
 nfc.nfc_exit(context)
