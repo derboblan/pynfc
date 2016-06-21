@@ -61,20 +61,26 @@ if nfc.nfc_device_set_property_bool(device, nfc.NP_HANDLE_PARITY, True) < 0:
 if nfc.nfc_device_set_property_bool(device, nfc.NP_EASY_FRAMING, True) < 0:
     raise Exception("Error setting Easy Framing property")
 
-for block in range(45):  # 45 pages in NTAG213
-    abttx = (ctypes.c_uint8 * 2)()  # command length
-    abttx[0] = MC_READ
-    abttx[1] = block
-    abtrx = (ctypes.c_uint8 * 16)()  # 16 is the minimum
-    res = nfc.nfc_initiator_transceive_bytes(device,
-                                             ctypes.pointer(abttx), len(abttx),
-                                             ctypes.pointer(abtrx), len(abtrx),
-                                             0)
-    if res < 0:
-        raise IOError("Error reading data")
-    #print("".join([chr(abtrx[i]) for i in range(res)]))
+def read_simple(pages):
+    for block in range(pages):  # 45 pages in NTAG213
+        abttx = (ctypes.c_uint8 * 2)()  # command length
+        abttx[0] = MC_READ
+        abttx[1] = block
+        abtrx = (ctypes.c_uint8 * 16)()  # 16 is the minimum
+        res = nfc.nfc_initiator_transceive_bytes(device,
+                                                 ctypes.pointer(abttx), len(abttx),
+                                                 ctypes.pointer(abtrx), len(abtrx),
+                                                 0)
+        if res < 0:
+            raise IOError("Error reading data")
+        #print("".join([chr(abtrx[i]) for i in range(res)]))
 
-    print("{:3}: {}".format(block, binascii.hexlify(bytes(abtrx[:res]))))
+        print("{:3}: {}".format(block, binascii.hexlify(bytes(abtrx[:res]))))
+
+def read_like_mfultralight(pages):
+    pass
+
+read_simple(45)
 
 nfc.nfc_close(device)
 
