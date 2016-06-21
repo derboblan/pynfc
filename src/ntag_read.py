@@ -63,7 +63,7 @@ if nfc.nfc_device_set_property_bool(device, nfc.NP_HANDLE_PARITY, True) < 0:
 # nt = nfc.nfc_target()
 # _ = nfc.nfc_initiator_select_passive_target(device, modulations[0], None, 0, ctypes.byref(nt))
 # uid = bytearray([nt.nti.nai.abtUid[i] for i in range(nt.nti.nai.szUidLen)])
-# print("uid = {}".format(binascii.hexlify(uid)))
+# print("uid = {}".format(uid))
 
 def set_easy_framing(enable=True):
     if nfc.nfc_device_set_property_bool(device, nfc.NP_EASY_FRAMING, enable) < 0:
@@ -103,9 +103,14 @@ def read_page(device, page):
     return data
 
 def read_simple(pages):
+    accumulated = []
+
     for page in range(pages):  # 45 pages in NTAG213
         data = read_page(device, page)
-        print("Read page  {:3}: {}".format(page, binascii.hexlify(data)))
+        print("Read page  {:3}: {}".format(page, data))
+        accumulated += list(data)
+
+    return bytes(accumulated)
 
 # read_simple(45)
 
@@ -113,8 +118,7 @@ def read_print(device, page, length=4):
     data = tranceive_bytes(device, bytes([MC_READ, page]), 16)
     if length:
         data = data[:length] # Only the first $length bytes
-    print("Read page  {:3}: {}".format(page, binascii.hexlify(data)))
-
+    print("Read page  {:3}: {}".format(page, data))
 
 def write_block(device, block, data):
     """Writes a block of data to an NTag
@@ -140,7 +144,7 @@ def write_block(device, block, data):
 
 def write_page(device, page, data, debug=False):
     if debug:
-        print("Write page {:3}: {}".format(page, binascii.hexlify(data)))
+        print("Write page {:3}: {}".format(page, data))
     if len(data) > 4:
         raise ValueError( "Data value to be written cannot be more than 4 bytes.")
     return write_block(device, page, data)
@@ -158,11 +162,23 @@ def write_user_memory(device, data, tagtype):
     for page, content in zip(range(start, end), page_contents):
         write_page(device, page, content, debug=True)
 
-write_user_memory(device, bytes([0x00] * 4 * 100), ntag_213)
+def read_user_memory(device, tagtype):
+    start = tagtype['user_memory_start']
+    end = tagtype['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+
+    user_memory = []
+    for page in range(start, end):
+        user_memory += list(read_page(device, page))
+
+    return bytes(user_memory)
+
+
+write_page(device, 41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring 
+# write_user_memory(device, bytes([0x00] * 4 * 100), ntag_213)
 
 print("-" * 10)
 
-read_simple(45)
+print(read_user_memory(device, ntag_213))
 
 nfc.nfc_close(device)
 
