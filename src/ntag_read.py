@@ -68,11 +68,6 @@ def set_easy_framing(enable=True):
 # _read_block
 set_easy_framing(True)
 
-def read_simple(pages):
-    for block in range(pages):  # 45 pages in NTAG213
-        data = tranceive_bytes(device, bytes([MC_READ, block]), 16)
-        print("{:3}: {}".format(block, binascii.hexlify(data)))
-
 def tranceive_bytes(device, transmission, receive_length):
     """
     Send the bytes in the send
@@ -98,7 +93,23 @@ def tranceive_bytes(device, transmission, receive_length):
     data = bytes(abtrx[:res])
     return data
 
+def read_page(device, page):
+    recv_data = tranceive_bytes(device, bytes([MC_READ, page]), 16)
+    data = recv_data[:4]  # Only the first 4 bytes as a page is 4 bytes
+    return data
+
+def read_simple(pages):
+    for page in range(pages):  # 45 pages in NTAG213
+        data = read_page(device, page)
+        print("{:3}: {}".format(page, binascii.hexlify(data)))
+
 read_simple(45)
+
+def read_print(device, page, length=4):
+    data = tranceive_bytes(device, bytes([MC_READ, page]), 16)
+    if length:
+        data = data[:length] # Only the first $length bytes
+    print("{:3}: {}".format(page, binascii.hexlify(data)))
 
 nfc.nfc_close(device)
 
