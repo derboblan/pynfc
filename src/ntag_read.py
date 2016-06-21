@@ -8,6 +8,10 @@ MC_AUTH_A = 0x60
 MC_AUTH_B = 0x61
 MC_READ = 0x30
 MC_WRITE = 0xA0
+MC_TRANSFER = 0xB0
+MC_DECREMENT = 0xC0
+MC_INCREMENT = 0xC1
+MC_STORE = 0xC2
 card_timeout = 10
 
 context = ctypes.pointer(nfc.nfc_context())
@@ -57,28 +61,144 @@ if nfc.nfc_device_set_property_bool(device, nfc.NP_HANDLE_PARITY, True) < 0:
 # uid = bytearray([nt.nti.nai.abtUid[i] for i in range(nt.nti.nai.szUidLen)])
 # print("uid = {}".format(binascii.hexlify(uid)))
 
+def set_easy_framing(enable=True):
+    if nfc.nfc_device_set_property_bool(device, nfc.NP_EASY_FRAMING, enable) < 0:
+        raise Exception("Error setting Easy Framing property")
+
 # _read_block
-if nfc.nfc_device_set_property_bool(device, nfc.NP_EASY_FRAMING, True) < 0:
-    raise Exception("Error setting Easy Framing property")
+set_easy_framing(True)
+
+# def nfc_initiator_mifare_cmd(pnd, mc, ui8Block, pmp=None):
+#     """
+#     /**
+#      * @brief Execute a MIFARE Classic Command
+#      * @return Returns true if action was successfully performed; otherwise returns false.
+#      * @param pmp Some commands need additional information. This information should be supplied in the mifare_param union.
+#      *
+#      * The specified MIFARE command will be executed on the tag. There are different commands possible, they all require the destination block number.
+#      * @note There are three different types of information (Authenticate, Data and Value).
+#      *
+#      * First an authentication must take place using Key A or B. It requires a 48 bit Key (6 bytes) and the UID.
+#      * They are both used to initialize the internal cipher-state of the PN53X chip.
+#      * After a successful authentication it will be possible to execute other commands (e.g. Read/Write).
+#      * The MIFARE Classic Specification (http://www.nxp.com/acrobat/other/identification/M001053_MF1ICS50_rev5_3.pdf) explains more about this process.
+#      */
+#     :param pnd: nfc_device
+#     :param mc: mifare_command
+#     :param ui8Block: block to execute command on (page)
+#     :param pmp: mifare_param
+#     :return:
+#     """
+#     abtRx = bytearray(265)
+#     szParamLen = 0
+#     abtCmd = bytearray(265)
+#     abtCmd[0] = mc  # The MIFARE Classic command
+#     abtCmd[1] = ui8Block  # The block address (1K=0x00..0x39, 4K=0x00..0xff)
+#
+#
+#     if mc == MC_READ: #  or MC_STORE
+#         szParamLen = 0
+#     elif mc == MC_AUTH_A or mc == MC_AUTH_B:
+#         szParamLen = 10 #sizeof(struct mifare_param_auth)
+#     elif mc == MC_WRITE:
+#         szParamLen = 16 #sizeof(struct mifare_param_data)
+#     elif mc in [MC_DECREMENT, MC_INCREMENT, MC_TRANSFER]:
+#         szParamLen = 4 #sizeof(struct mifare_param_value)
+#     else:
+#         return False
+#
+#     abtCmd[1:1+szParamLen] = pmp[szParamLen]
+#
+#     set_easy_framing(True)
+#
+#     res = nfc.nfc_initiator_transceive_bytes(pnd,
+#                                              abtCmd, 2+szParamLen,
+#                                              ctypes.pointer(abtRx), len(abtRx))
+#     if res < 0:
+#         raise IOError("Error reading data")
+#
+#     if mc == MC_READ:
+#         if res == 16:
+#             return abtRx[:16]
+#         else:
+#             print("Could not read, res={}".format(res))
+#             return []
+#     return []
+
+# def read_like_mfultralight(pages):
+#
+#     pagestep = 4
+#     failure = False
+#     uiBlocks = pages
+#     read_pages = 0
+#     print("Reading {} pages |".format(uiBlocks + 1), end='')
+#
+#     for page in range(uiBlocks, step=pagestep): #(page = 0 page <= uiBlocks page += 4)
+#         print("page: %d\n", page)
+#
+#         # Try to read out the data block
+#         data = nfc_initiator_mifare_cmd(device, MC_READ, page)
+#
+#         # if (nfc_initiator_mifare_cmd(pnd, MC_READ, page, & mp)) {
+#         #     memcpy(mtDump.amb[page / 4].mbd.abtData, mp.mpd.abtData, 16)
+#         # } else {
+#         #     bFailure = true
+#         #     break
+#         # }
+#
+#         for i in range(pagestep):
+#             print("{}".format({True:'.', False:'x'}[failure]), end='')
+#             read_pages += 1
+#     print("|")
+#     print("Done, %d of %d pages read.\n", read_pages, uiBlocks + 1)
+#
+#
+#     return success
+
+
 
 def read_simple(pages):
     for block in range(pages):  # 45 pages in NTAG213
-        abttx = (ctypes.c_uint8 * 2)()  # command length
-        abttx[0] = MC_READ
-        abttx[1] = block
-        abtrx = (ctypes.c_uint8 * 16)()  # 16 is the minimum
-        res = nfc.nfc_initiator_transceive_bytes(device,
-                                                 ctypes.pointer(abttx), len(abttx),
-                                                 ctypes.pointer(abtrx), len(abtrx),
-                                                 0)
-        if res < 0:
-            raise IOError("Error reading data")
-        #print("".join([chr(abtrx[i]) for i in range(res)]))
+        # abttx = (ctypes.c_uint8 * 2)()  # command length
+        # abttx[0] = MC_READ
+        # abttx[1] = block
+        # abtrx = (ctypes.c_uint8 * 16)()  # 16 is the minimum
+        # res = nfc.nfc_initiator_transceive_bytes(device,
+        #                                          ctypes.pointer(abttx), len(abttx),
+        #                                          ctypes.pointer(abtrx), len(abtrx),
+        #                                          0)
+        # if res < 0:
+        #     raise IOError("Error reading data")
+        # #print("".join([chr(abtrx[i]) for i in range(res)]))
+        #
+        # print("{:3}: {}".format(block, binascii.hexlify(bytes(abtrx[:res]))))
+        data = tranceive_bytes(device, [MC_READ, block], 16)
+        print("{:3}: {}".format(block, binascii.hexlify(data)))
 
-        print("{:3}: {}".format(block, binascii.hexlify(bytes(abtrx[:res]))))
+def tranceive_bytes(device, transmission, receive_length):
+    """
+    Send the bytes in the send
+    :param device: The device *via* which to transmit the bytes
+    :param transmission: Data or command to send:
+    :type transmission bytes
+    :param receive_length: how many bytes to receive?
+    :type receive_length int
+    :return:
+    """
+    abttx = (ctypes.c_uint8 * len(transmission))()  # command length
+    for index, byte in enumerate(transmission):
+        abttx[index] = byte
 
-def read_like_mfultralight(pages):
-    pass
+    abtrx = (ctypes.c_uint8 * receive_length)()  # 16 is the minimum
+    res = nfc.nfc_initiator_transceive_bytes(device,
+                                             ctypes.pointer(abttx), len(abttx),
+                                             ctypes.pointer(abtrx), len(abtrx),
+                                             0)
+    if res < 0:
+        raise IOError("Error reading data")
+
+    data = bytes(abtrx[:res])
+    return data
 
 read_simple(45)
 
