@@ -4,6 +4,10 @@ from . import nfc
 import ctypes
 import binascii
 
+ntag_213 = {"user_memory_start":4, "user_memory_end":39}  # 4 is the first page of the user memory, 39 is the last
+ntag_215 = {"user_memory_start":4, "user_memory_end":129}  # 4 is the first page of the user memory, 39 is the last
+ntag_216 = {"user_memory_start":4, "user_memory_end":225}  # 4 is the first page of the user memory, 39 is the last
+
 MC_AUTH_A = 0x60
 MC_AUTH_B = 0x61
 MC_READ = 0x30
@@ -101,15 +105,15 @@ def read_page(device, page):
 def read_simple(pages):
     for page in range(pages):  # 45 pages in NTAG213
         data = read_page(device, page)
-        print("{:3}: {}".format(page, binascii.hexlify(data)))
+        print("Read page  {:3}: {}".format(page, binascii.hexlify(data)))
 
-read_simple(45)
+# read_simple(45)
 
 def read_print(device, page, length=4):
     data = tranceive_bytes(device, bytes([MC_READ, page]), 16)
     if length:
         data = data[:length] # Only the first $length bytes
-    print("{:3}: {}".format(page, binascii.hexlify(data)))
+    print("Read page  {:3}: {}".format(page, binascii.hexlify(data)))
 
 
 def write_block(device, block, data):
@@ -134,15 +138,31 @@ def write_block(device, block, data):
     recv = tranceive_bytes(device, bytes(abttx), 250)
     return recv
 
-def write_page(device, page, data):
+def write_page(device, page, data, debug=False):
+    if debug:
+        print("Write page {:3}: {}".format(page, binascii.hexlify(data)))
     if len(data) > 4:
         raise ValueError( "Data value to be written cannot be more than 4 bytes.")
     return write_block(device, page, data)
 
-print("write: ", write_page(device, 5, bytes([0xff,0xff,0xff,0xff])))
+# write_page(device, 4, bytes([0xff,0xff,0xff,0xff]))
+# write_page(device, 5, bytes([0xff,0xff,0xff,0xff]))
+# write_page(device, 6, bytes([0xff,0xff,0xff,0xff]))
+
+def write_user_memory(device, data, tagtype):
+    start = tagtype['user_memory_start']
+    end = tagtype['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+
+    page_contents = [data[i:i+4] for i in range(0, len(data), 4)]
+    print("Writing {} pages".format(len(page_contents)))
+    for page, content in zip(range(start, end), page_contents):
+        write_page(device, page, content, debug=True)
+
+write_user_memory(device, bytes([0x00] * 4 * 100), ntag_213)
+
+print("-" * 10)
 
 read_simple(45)
-
 
 nfc.nfc_close(device)
 
