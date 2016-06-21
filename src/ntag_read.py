@@ -70,20 +70,7 @@ set_easy_framing(True)
 
 def read_simple(pages):
     for block in range(pages):  # 45 pages in NTAG213
-        # abttx = (ctypes.c_uint8 * 2)()  # command length
-        # abttx[0] = MC_READ
-        # abttx[1] = block
-        # abtrx = (ctypes.c_uint8 * 16)()  # 16 is the minimum
-        # res = nfc.nfc_initiator_transceive_bytes(device,
-        #                                          ctypes.pointer(abttx), len(abttx),
-        #                                          ctypes.pointer(abtrx), len(abtrx),
-        #                                          0)
-        # if res < 0:
-        #     raise IOError("Error reading data")
-        # #print("".join([chr(abtrx[i]) for i in range(res)]))
-        #
-        # print("{:3}: {}".format(block, binascii.hexlify(bytes(abtrx[:res]))))
-        data = tranceive_bytes(device, [MC_READ, block], 16)
+        data = tranceive_bytes(device, bytes([MC_READ, block]), 16)
         print("{:3}: {}".format(block, binascii.hexlify(data)))
 
 def tranceive_bytes(device, transmission, receive_length):
