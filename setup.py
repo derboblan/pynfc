@@ -28,6 +28,6 @@ setup(
     author = "Mike Auty",
     data_files = [('examples', ['mifareauth.py'])],
     license = "GPL-2",
-    py_modules = ['pynfc', 'pycrypto1', 'py14443a']
+    py_modules = ['src.pynfc']
 )
 

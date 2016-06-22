@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-from . import nfc
+from . import pynfc as nfc
 import ctypes
 import binascii
 
