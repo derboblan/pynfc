@@ -4,10 +4,14 @@ from . import pynfc as nfc
 import ctypes
 import binascii
 import enum
+import logging
 
 NTAG_213 = {"user_memory_start": 4, "user_memory_end": 39}  # 4 is the first page of the user memory, 39 is the last
 NTAG_215 = {"user_memory_start": 4, "user_memory_end": 129}  # 4 is the first page of the user memory, 129 is the last
 NTAG_216 = {"user_memory_start": 4, "user_memory_end": 225}  # 4 is the first page of the user memory, 255 is the last
+
+SET_CONNSTRING = 'You may need to $ export LIBNFC_DEFAULT_DEVICE="pn532_uart:/dev/ttyUSB0" ' \
+                 'or edit /etc/nfc/libnfc.conf and set device.connstring in case of a failure'
 
 class Commands(enum.Enum):
     MC_AUTH_A = 0x60
@@ -20,22 +24,49 @@ class Commands(enum.Enum):
     MC_STORE = 0xC2
 
 class NTagReadWrite(object):
+    """
+    Allows to read/write to an NTag 21x device.
+    Tested with a Adafruit PN532 breakout board connected via serial over an FTDI cable
+    """
     card_timeout = 10
 
-    def __init__(self):
-        self.context = ctypes.pointer(nfc.nfc_context())
-        nfc.nfc_init(ctypes.byref(self.context))
+    def __init__(self, logger=None):
+        """Initialize a ReadWrite object
+        :param logger: function to be called as logging. Can be import logging; logging.getLogger("ntag_read").info or simply the builtin print function.
+        Defaults to no logging"""
+        def nolog(log):
+            pass
+        self.log = logger if logger else nolog
 
-        conn_strings = (nfc.nfc_connstring * 10)()
-        devices_found = nfc.nfc_list_devices(self.context, conn_strings, 10)
+        try:
+            self.context = ctypes.pointer(nfc.nfc_context())
+            self.log("Created NFC library context")
+            nfc.nfc_init(ctypes.byref(self.context))
+            self.log("Initializing NFC library")
 
-        if not devices_found:
-            IOError("No devices found")
+            conn_strings = (nfc.nfc_connstring * 10)()
+            devices_found = nfc.nfc_list_devices(self.context, conn_strings, 10)
+            # import ipdb; ipdb.set_trace()
+            self.log("{} devices found".format(devices_found))
 
-        self.device = nfc.nfc_open(self.context, conn_strings[0])
-        _ = nfc.nfc_initiator_init(self.device)
+            if not devices_found:
+                IOError("No devices found. "+SET_CONNSTRING)
+            else:
+                self.log("Using conn_string[0] = {} to get a device. {}".format(conn_strings[0].value, SET_CONNSTRING))
+
+            self.device = nfc.nfc_open(self.context, conn_strings[0])
+            self.log("Opened device {}, initializing NFC initiator".format(self.device))
+            _ = nfc.nfc_initiator_init(self.device)
+            self.log("NFC initiator initialized")
+        except IOError as error:
+            IOError(SET_CONNSTRING)
 
     def setup_target(self):
+        """
+        Find a target if there is one and returns the target's UID
+        :return: UID of the found target
+        :rtype bytes
+        """
         nt = nfc.nfc_target()
 
         mods = [(nfc.NMT_ISO14443A, nfc.NBR_106)]
@@ -50,8 +81,7 @@ class NTagReadWrite(object):
             raise IOError("NFC Error whilst polling")
 
         uidLen = 7
-        uid = bytearray([nt.nti.nai.abtUid[i] for i in range(uidLen)])
-        print("uid = {}".format(binascii.hexlify(uid)))
+        uid = bytes([nt.nti.nai.abtUid[i] for i in range(uidLen)])
 
         # setup device
         if nfc.nfc_device_set_property_bool(self.device, nfc.NP_ACTIVATE_CRYPTO1, True) < 0:
@@ -63,11 +93,7 @@ class NTagReadWrite(object):
         if nfc.nfc_device_set_property_bool(self.device, nfc.NP_HANDLE_PARITY, True) < 0:
             raise Exception("Error setting Easy Framing property")
 
-        # Select card, but waits for tag the be removed and placed again
-        # nt = nfc.nfc_target()
-        # _ = nfc.nfc_initiator_select_passive_target(self.device, modulations[0], None, 0, ctypes.byref(nt))
-        # uid = bytearray([nt.nti.nai.abtUid[i] for i in range(nt.nti.nai.szUidLen)])
-        # print("uid = {}".format(uid))
+        return uid
 
     def set_easy_framing(self, enable=True):
         if nfc.nfc_device_set_property_bool(self.device, nfc.NP_EASY_FRAMING, enable) < 0:
@@ -81,7 +107,7 @@ class NTagReadWrite(object):
         :type transmission bytes
         :param receive_length: how many bytes to receive?
         :type receive_length int
-        :return:
+        :return: whatever was received back. Should be nothing actually
         """
 
         abttx = (ctypes.c_uint8 * len(transmission))()  # command length
@@ -100,27 +126,22 @@ class NTagReadWrite(object):
         return data
 
     def read_page(self, page):
-        recv_data = self.transceive_bytes(bytes([int(Commands.MC_READ.value), page]), 16)
-        data = recv_data[:4]  # Only the first 4 bytes as a page is 4 bytes
+        """Read the bytes at the given page"""
+        received_data = self.transceive_bytes(bytes([int(Commands.MC_READ.value), page]), 16)
+        data = received_data[:4]  # Only the first 4 bytes as a page is 4 bytes
         return data
 
-    def read_simple(self, pages):
-        self.set_easy_framing(True)
+    def read_user_memory(self, tag_type):
+        """Read the complete user memory, ie. the actual content of the tag.
+        Configuration bytes surrounding the user memory is omitted"""
+        start = tag_type['user_memory_start']
+        end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
 
-        accumulated = []
+        user_memory = []
+        for page in range(start, end):
+            user_memory += list(self.read_page(page))
 
-        for page in range(pages):  # 45 pages in NTAG213
-            data = self.read_page(page)
-            print("Read page  {:3}: {}".format(page, data))
-            accumulated += list(data)
-
-        return bytes(accumulated)
-
-    def read_print(self, page, length=4):
-        data = self.transceive_bytes(bytes([int(Commands.MC_READ.value), page]), 16)
-        if length:
-            data = data[:length] # Only the first $length bytes
-        print("Read page  {:3}: {}".format(page, data))
+        return bytes(user_memory)
 
     def write_block(self, block, data):
         """Writes a block of data to an NTag
@@ -148,6 +169,9 @@ class NTagReadWrite(object):
         return self.write_block(page, data)
 
     def write_user_memory(self, data, tag_type):
+        """Read the complete user memory, ie. the actual content of the tag.
+        Configuration bytes surrounding the user memory are omitted, given the correct tag type.
+        Otherwise, we cannot know where user memory start and ends"""
         start = tag_type['user_memory_start']
         end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
 
@@ -156,32 +180,27 @@ class NTagReadWrite(object):
         for page, content in zip(range(start, end), page_contents):
             self.write_page(page, content, debug=True)
 
-    def read_user_memory(self, tag_type):
-        start = tag_type['user_memory_start']
-        end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
-
-        user_memory = []
-        for page in range(start, end):
-            user_memory += list(self.read_page(page))
-
-        return bytes(user_memory)
-
     def close(self):
         nfc.nfc_close(self.device)
         nfc.nfc_exit(self.context)
 
 if __name__ == "__main__":
-    read_writer= NTagReadWrite()
-    read_writer.setup_target()
+    logger = print  # logging.getLogger("ntag_read").info
+
+    read_writer= NTagReadWrite(logger)
+
+    uid = read_writer.setup_target()
+    print("uid = {}".format(binascii.hexlify(uid)))
+
     read_writer.set_easy_framing()
 
-    read_writer.write_page(41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring
-    # write_user_memory(self.device, bytes([0x00] * 4 * 100), NTAG_213)
-    # write_page(self.device, 4, bytes([0xff,0xff,0xff,0xff]))
-    # write_page(self.device, 5, bytes([0xff,0xff,0xff,0xff]))
-    # write_page(self.device, 6, bytes([0xff,0xff,0xff,0xff]))
+    # read_writer.write_page(41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring
+    # read_writer.write_user_memory(self.device, bytes([0x00] * 4 * 100), NTAG_213)
+    # read_writer.write_page(self.device, 4, bytes([0xff,0xff,0xff,0xff]))
+    # read_writer.write_page(self.device, 5, bytes([0xff,0xff,0xff,0xff]))
+    # read_writer.write_page(self.device, 6, bytes([0xff,0xff,0xff,0xff]))
 
-    print("-" * 10)
+    # print("-" * 10)
 
     print(read_writer.read_user_memory(NTAG_213))
 
