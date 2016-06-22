@@ -26,7 +26,7 @@ setup(
     version = "1.7.0_alpha1",
     description = "Python bindings for libnfc",
     author = "Mike Auty",
-    data_files = [('examples', ['mifareauth.py'])],
+    data_files = [('examples', ['src/mifareauth.py', 'src/ntag_read.py'])],
     license = "GPL-2",
     py_modules = ['src.pynfc']
 )
