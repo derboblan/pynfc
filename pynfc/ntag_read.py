@@ -19,7 +19,7 @@ class Commands(enum.Enum):
     MC_INCREMENT = 0xC1
     MC_STORE = 0xC2
 
-class NTagReader(object):
+class NTagReadWrite(object):
     card_timeout = 10
 
     def __init__(self):
@@ -171,11 +171,11 @@ class NTagReader(object):
         nfc.nfc_exit(self.context)
 
 if __name__ == "__main__":
-    reader = NTagReader()
-    reader.setup_target()
-    reader.set_easy_framing()
+    read_writer= NTagReadWrite()
+    read_writer.setup_target()
+    read_writer.set_easy_framing()
 
-    reader.write_page(41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring
+    read_writer.write_page(41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring
     # write_user_memory(self.device, bytes([0x00] * 4 * 100), NTAG_213)
     # write_page(self.device, 4, bytes([0xff,0xff,0xff,0xff]))
     # write_page(self.device, 5, bytes([0xff,0xff,0xff,0xff]))
@@ -183,6 +183,6 @@ if __name__ == "__main__":
 
     print("-" * 10)
 
-    print(reader.read_user_memory(NTAG_213))
+    print(read_writer.read_user_memory(NTAG_213))
 
-    reader.close()
+    read_writer.close()
