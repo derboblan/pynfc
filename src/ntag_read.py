@@ -173,7 +173,7 @@ def read_user_memory(device, tagtype):
     return bytes(user_memory)
 
 
-write_page(device, 41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring 
+write_page(device, 41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring
 # write_user_memory(device, bytes([0x00] * 4 * 100), ntag_213)
 
 print("-" * 10)
