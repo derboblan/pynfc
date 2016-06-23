@@ -135,8 +135,8 @@ class NTagReadWrite(object):
     def read_user_memory(self, tag_type):
         """Read the complete user memory, ie. the actual content of the tag.
         Configuration bytes surrounding the user memory is omitted"""
-        start = tag_type['user_memory_start']
-        end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+        start = tag_type.value['user_memory_start']
+        end = tag_type.value['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
 
         user_memory = []
         for page in range(start, end):
@@ -173,8 +173,8 @@ class NTagReadWrite(object):
         """Read the complete user memory, ie. the actual content of the tag.
         Configuration bytes surrounding the user memory are omitted, given the correct tag type.
         Otherwise, we cannot know where user memory start and ends"""
-        start = tag_type['user_memory_start']
-        end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+        start = tag_type.value['user_memory_start']
+        end = tag_type.value['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
 
         page_contents = [data[i:i+4] for i in range(0, len(data), 4)]
         print("Writing {} pages".format(len(page_contents)))
@@ -203,6 +203,6 @@ if __name__ == "__main__":
 
     # print("-" * 10)
 
-    print(read_writer.read_user_memory(tag_type=TagType.NTAG_213.value))
+    print(read_writer.read_user_memory(tag_type=TagType.NTAG_213))
 
     read_writer.close()
