@@ -6,9 +6,10 @@ import binascii
 import enum
 import logging
 
-NTAG_213 = {"user_memory_start": 4, "user_memory_end": 39}  # 4 is the first page of the user memory, 39 is the last
-NTAG_215 = {"user_memory_start": 4, "user_memory_end": 129}  # 4 is the first page of the user memory, 129 is the last
-NTAG_216 = {"user_memory_start": 4, "user_memory_end": 225}  # 4 is the first page of the user memory, 255 is the last
+class TagType(enum.Enum):
+    NTAG_213 = {"user_memory_start": 4, "user_memory_end": 39}  # 4 is the first page of the user memory, 39 is the last
+    NTAG_215 = {"user_memory_start": 4, "user_memory_end": 129}  # 4 is the first page of the user memory, 129 is the last
+    NTAG_216 = {"user_memory_start": 4, "user_memory_end": 225}  # 4 is the first page of the user memory, 255 is the last
 
 SET_CONNSTRING = 'You may need to $ export LIBNFC_DEFAULT_DEVICE="pn532_uart:/dev/ttyUSB0" ' \
                  'or edit /etc/nfc/libnfc.conf and set device.connstring in case of a failure'
@@ -195,13 +196,13 @@ if __name__ == "__main__":
     read_writer.set_easy_framing()
 
     # read_writer.write_page(41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring
-    # read_writer.write_user_memory(self.device, bytes([0x00] * 4 * 100), NTAG_213)
+    # read_writer.write_user_memory(self.device, bytes([0x00] * 4 * 100), TagType.NTAG_213.value)
     # read_writer.write_page(self.device, 4, bytes([0xff,0xff,0xff,0xff]))
     # read_writer.write_page(self.device, 5, bytes([0xff,0xff,0xff,0xff]))
     # read_writer.write_page(self.device, 6, bytes([0xff,0xff,0xff,0xff]))
 
     # print("-" * 10)
 
-    print(read_writer.read_user_memory(NTAG_213))
+    print(read_writer.read_user_memory(tag_type=TagType.NTAG_213.value))
 
     read_writer.close()
