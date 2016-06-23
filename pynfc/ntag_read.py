@@ -177,7 +177,7 @@ class NTagReadWrite(object):
         end = tag_type.value['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
 
         page_contents = [data[i:i+4] for i in range(0, len(data), 4)]
-        print("Writing {} pages".format(len(page_contents)))
+        self.log("Writing {} pages".format(len(page_contents)))
         for page, content in zip(range(start, end), page_contents):
             self.write_page(page, content, debug=True)
 
