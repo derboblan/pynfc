@@ -169,7 +169,7 @@ class NTagReadWrite(object):
             raise ValueError( "Data value to be written cannot be more than 4 bytes.")
         return self.write_block(page, data)
 
-    def write_user_memory(self, data, tag_type):
+    def write_user_memory(self, data, tag_type, debug=False):
         """Read the complete user memory, ie. the actual content of the tag.
         Configuration bytes surrounding the user memory are omitted, given the correct tag type.
         Otherwise, we cannot know where user memory start and ends"""
@@ -179,7 +179,7 @@ class NTagReadWrite(object):
         page_contents = [data[i:i+4] for i in range(0, len(data), 4)]
         self.log("Writing {} pages".format(len(page_contents)))
         for page, content in zip(range(start, end), page_contents):
-            self.write_page(page, content, debug=True)
+            self.write_page(page, content, debug)
 
     def close(self):
         nfc.nfc_close(self.device)
