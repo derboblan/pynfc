@@ -39,6 +39,12 @@ class NTagReadWrite(object):
             pass
         self.log = logger if logger else nolog
 
+        mods = [(nfc.NMT_ISO14443A, nfc.NBR_106)]
+        self.modulations = (nfc.nfc_modulation * len(mods))()
+        for i in range(len(mods)):
+            self.modulations[i].nmt = mods[i][0]
+            self.modulations[i].nbr = mods[i][1]
+
         try:
             self.context = ctypes.pointer(nfc.nfc_context())
             self.log("Created NFC library context")
@@ -62,6 +68,23 @@ class NTagReadWrite(object):
         except IOError as error:
             IOError(SET_CONNSTRING)
 
+    def list_targets(self, max_targets=10):
+        """
+        List the targets detected by the device
+        :param max_targets: amount of targets to maximally find
+        :return: list of bytes with the found UIDs
+        """
+        targets = (nfc.nfc_target * max_targets)()
+        count = nfc.nfc_initiator_list_passive_targets(self.device, self.modulations[0], targets, len(targets))
+
+        uids = []
+        for index in range(count):
+            uidLen = 7
+            uid = bytes([targets[index].nti.nai.abtUid[i] for i in range(uidLen)])
+            uids += [uid]
+
+        return uids
+
     def setup_target(self):
         """
         Find a target if there is one and returns the target's UID
@@ -70,13 +93,7 @@ class NTagReadWrite(object):
         """
         nt = nfc.nfc_target()
 
-        mods = [(nfc.NMT_ISO14443A, nfc.NBR_106)]
-        modulations = (nfc.nfc_modulation * len(mods))()
-        for i in range(len(mods)):
-            modulations[i].nmt = mods[i][0]
-            modulations[i].nbr = mods[i][1]
-
-        res = nfc.nfc_initiator_poll_target(self.device, modulations, len(modulations), 10, 2, ctypes.byref(nt))
+        res = nfc.nfc_initiator_poll_target(self.device, self.modulations, len(self.modulations), 10, 2, ctypes.byref(nt))
 
         if res < 0:
             raise IOError("NFC Error whilst polling")
@@ -195,7 +212,13 @@ class NTagReadWrite(object):
 if __name__ == "__main__":
     logger = print  # logging.getLogger("ntag_read").info
 
-    read_writer= NTagReadWrite(logger)
+    read_writer = NTagReadWrite(logger)
+
+    uids = read_writer.list_targets()
+    if len(uids) > 1:
+        print("Found {count} uids: {uids}. Please remove all but one from the device".format(count=len(uids), uids=uids))
+        exit(-1)
+
 
     uid = read_writer.setup_target()
     print("uid = {}".format(binascii.hexlify(uid)))
