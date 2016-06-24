@@ -175,8 +175,15 @@ class NTagReadWrite(object):
         Otherwise, we cannot know where user memory start and ends"""
         start = tag_type.value['user_memory_start']
         end = tag_type.value['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+        mem_size = (end-start)
 
         page_contents = [data[i:i+4] for i in range(0, len(data), 4)]
+        content_size = len(page_contents)
+
+        if content_size > mem_size:
+            raise ValueError("{type} user memory ({mem_size} 4-byte pages) too small for content ({content_size} 4-byte pages)".
+                             format(type=tag_type, mem_size=mem_size, content_size=content_size))
+
         self.log("Writing {} pages".format(len(page_contents)))
         for page, content in zip(range(start, end), page_contents):
             self.write_page(page, content, debug)
