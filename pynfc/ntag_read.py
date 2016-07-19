@@ -15,14 +15,15 @@ SET_CONNSTRING = 'You may need to $ export LIBNFC_DEFAULT_DEVICE="pn532_uart:/de
                  'or edit /etc/nfc/libnfc.conf and set device.connstring in case of a failure'
 
 class Commands(enum.Enum):
-    MC_AUTH_A = 0x60
-    MC_AUTH_B = 0x61
+    MC_GET_VERSION = 0x60
     MC_READ = 0x30
-    MC_WRITE = 0xA0
-    MC_TRANSFER = 0xB0
-    MC_DECREMENT = 0xC0
-    MC_INCREMENT = 0xC1
-    MC_STORE = 0xC2
+    MC_FAST_READ = 0x3a
+    MC_WRITE = 0xA2
+    MC_COMPATIBILITY_WRITE = 0xA0
+    MC_READ_CNT = 0x39
+    MC_PWD_AUTH = 0x1b
+    MC_READ_SIG = 0x3c
+
 
 class NTagReadWrite(object):
     """
@@ -171,7 +172,7 @@ class NTagReadWrite(object):
             raise ValueError( "Data value to be written cannot be more than 16 bytes.")
 
         abttx = bytearray(18) # 18 is 1 byte for command, 1 byte for block/page address, 16 for actual data
-        abttx[0] = int(Commands.MC_WRITE.value)
+        abttx[0] = int(Commands.MC_COMPATIBILITY_WRITE.value)
         abttx[1] = block
         for index, byte in enumerate(data):
             abttx[index + 2] = byte
@@ -205,6 +206,104 @@ class NTagReadWrite(object):
         for page, content in zip(range(start, end), page_contents):
             self.write_page(page, content, debug)
 
+    def authenticate(self, password, acknowledge=b'\x00\x00'):
+        """After issuesing this command correctly, the tag goes into the Authenticated-state,
+        during which the protected bytes can be written
+        :param password the 4-byte password with which the tag is protected
+        :type password bytes
+        :param acknowledge the 2 Password ACKnowledge bytes. If these are received, the password was correct
+        :returns whether the password was correct or not
+        :rtype bool"""
+        self.set_easy_framing(True)
+
+        if len(password) != 4:
+            raise ValueError( "Password must be 4 bytes")
+
+        if len(acknowledge) != 2:
+            raise ValueError( "Password ACKnowledge must be 2 bytes")
+
+        cmd = int(Commands.MC_PWD_AUTH.value)
+
+        ctypes_key = (ctypes.c_uint8 * len(password))()  # command length
+        for index, byte in enumerate(password):
+            ctypes_key[index] = byte
+
+        crc = (ctypes.c_uint8 * 2)()
+
+        nfc.iso14443a_crc(ctypes.pointer(ctypes_key), len(password), ctypes.pointer(crc))
+
+        abttx = bytes([cmd]) + password + bytes(crc)
+
+        recv = self.transceive_bytes(bytes(abttx), 16)
+
+        return recv == acknowledge
+
+    def set_password(self, tag_type, password=b'\xff\xff\xff\xff', acknowledge=b'\x00\x00', max_attempts=None,
+                     also_read=False, auth_from=0xFF, lock_config=False, enable_counter=False, protect_counter=False):
+        """
+
+        The AUTH0-byte (byte 3 on page 0x29/0x83/0xE3 for resp Ntag 213,215,216) defines the page address from which the password verification is required.
+        0xFF effectively disables it
+
+        The ACCESS-byte (byte 0 on page 0x2A/0x84/0xE4 for resp Ntag 213,215,216) consists of some bitfields:
+        - 7: PROT: 0 = write access is password protected, 1 = read and write are is password protected
+        - 6: CGFLCK: Write locking bit for the user configuration
+        - 5: RFUI (reserved for future use)
+        - 4: NFC_CNT_EN: NFC counter configuration
+        - 3: NFC_CNT_PWD_PROT: NFC counter password protection
+        - 2,1,0: AUTHLIM: Limitation of negative password verification attempts
+
+        The PACK-bytes in the PACK-page have a 16-bit password acknowledge used during the password verification process
+
+        Password protected is needed to prevent the user from accidentally writing the tag with a NFC enabled phone.
+        With a password, writing is still possible but needs to be deliberate.
+        The password must thus protect writing only, but for the whole tag so the start page in AUTH0 must be 0
+        There's no need to lock the user configuration (i.e. these bytes generated here), so CGFLCK=0
+        """
+        cfg0_page = tag_type.value['user_memory_end'] + 2
+        cfg1_page = cfg0_page + 1
+        pwd_page = cfg1_page + 1
+        pack_page = pwd_page + 1
+
+        cfg0 = bytearray(self.read_page(cfg0_page))
+        # [MIRROR, rfui, MIRROR_PAGE, AUTH0], so we overwrite
+        cfg0[3] = auth_from
+
+        access = 0b00000000
+
+        prot = 0b10000000 if also_read else 0b00000000
+        access |= prot
+
+        cfglck = 0b01000000 if lock_config else 0b00000000
+        access |= cfglck
+
+        nfc_cnt_en = 0b00010000 if enable_counter else 0b00000000
+        access |= nfc_cnt_en
+
+        nfc_cnt_pwd_prot = 0b00001000 if protect_counter else 0b00000000
+        access |= nfc_cnt_pwd_prot
+
+        if max_attempts and max_attempts > 7:
+            raise ValueError("Max_attempts can be set to 7 at most (0b111) ")
+
+        authlim = max_attempts if max_attempts != None else 0b000 # 3 bit field, at the end of  the byte so no shifting is needed
+        access |= authlim
+
+        #       ACCESS,     rfui,       rfui,       rfui
+        cfg1 = [access, 0b00000000, 0b00000000, 0b00000000]
+
+        # Password
+        pwd = password
+
+        #      [PACK, PACK,         rfui,       rfui
+        pack = acknowledge + bytes([0b00000000, 0b00000000])  # unused
+
+        self.write_page(pack_page, pack)
+        self.write_page(pwd_page, pwd)
+        self.write_page(cfg1_page, cfg1)
+        self.write_page(cfg0_page, cfg0)
+
+
     def close(self):
         nfc.nfc_close(self.device)
         nfc.nfc_exit(self.context)
@@ -219,6 +318,8 @@ if __name__ == "__main__":
         print("Found {count} uids: {uids}. Please remove all but one from the device".format(count=len(uids), uids=uids))
         exit(-1)
 
+    tt = TagType.NTAG_216
+    testpage = 200  # Must be available on the chosen tag type.
 
     uid = read_writer.setup_target()
     print("uid = {}".format(binascii.hexlify(uid)))
@@ -229,10 +330,28 @@ if __name__ == "__main__":
     # read_writer.write_user_memory(self.device, bytes([0x00] * 4 * 100), TagType.NTAG_213.value)
     # read_writer.write_page(self.device, 4, bytes([0xff,0xff,0xff,0xff]))
     # read_writer.write_page(self.device, 5, bytes([0xff,0xff,0xff,0xff]))
-    # read_writer.write_page(self.device, 6, bytes([0xff,0xff,0xff,0xff]))
 
-    # print("-" * 10)
 
-    print(read_writer.read_user_memory(tag_type=TagType.NTAG_213))
+    read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # Now, this page is writable
+
+    print(read_writer.read_user_memory(tag_type=tt))
+
+    password = bytes([1, 2, 3, 4])
+    ack = bytes([0xaa, 0xaa])
+
+    import ipdb; ipdb.set_trace()
+    read_writer.set_password(tt, password=password, acknowledge=ack, auth_from=testpage)
+
+    read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
+
+    try:
+        read_writer.authenticate(password=password, acknowledge=ack)
+
+        read_writer.write_page(testpage, bytes([0xaa, 0xaa, 0xaa, 0xaa]))  # After authenticating ourselves, its writeable again
+    except: pass
+
+    print(read_writer.read_user_memory(tag_type=tt))
+
+    read_writer.set_password(tt)  # Default arguments set to default state, clearing the password
 
     read_writer.close()
