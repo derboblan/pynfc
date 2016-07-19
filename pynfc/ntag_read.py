@@ -207,14 +207,28 @@ class NTagReadWrite(object):
             self.write_page(page, content, debug)
 
     def authenticate(self, password, acknowledge=b'\x00\x00'):
-        """After issuesing this command correctly, the tag goes into the Authenticated-state,
+        """After issuing this command correctly, the tag goes into the Authenticated-state,
         during which the protected bytes can be written
         :param password the 4-byte password with which the tag is protected
         :type password bytes
         :param acknowledge the 2 Password ACKnowledge bytes. If these are received, the password was correct
         :returns whether the password was correct or not
         :rtype bool"""
-        self.set_easy_framing(True)
+
+        # With easy framing enabled, there will be an "Application level error".
+        # With easy-framing disabled, 'Chip error: "Timeout" (01), returned error: "RF Transmission Error" (-20))'
+        # The PWD_AUTH command can have a timeout of max. 5ms.
+        # With the timeout in tranceive_bytes set to:
+        #    0ms: "Chip error: "Timeout" (01), returned error: "RF Transmission Error" (-20))",
+        #    1ms, "libnfc.bus.uart	Timeout!" even before authenticating, its simply too short
+        #    5ms, "libnfc.bus.uart	Timeout!" even before authenticating, its simply too short
+        #   10ms, "libnfc.bus.uart	Timeout!"
+        #  100ms: "Chip error: "Timeout" (01), returned error: "RF Transmission Error" (-20))",
+        #         Which would indicate the wait for the UART is long enough (also the default).
+        # But, this sets the timeout for the communication between host and PN532, not between PN532 and NTag.
+        # On the other hand, this 5ms is the same for reading, to there should not be a need to set a different timeout
+        # for PN532-to-NTag communication.
+        self.set_easy_framing(False)
 
         if len(password) != 4:
             raise ValueError( "Password must be 4 bytes")
@@ -332,23 +346,21 @@ if __name__ == "__main__":
     # read_writer.write_page(self.device, 5, bytes([0xff,0xff,0xff,0xff]))
 
 
-    read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # Now, this page is writable
+    # read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # Now, this page is writable
 
     print(read_writer.read_user_memory(tag_type=tt))
 
     password = bytes([1, 2, 3, 4])
     ack = bytes([0xaa, 0xaa])
 
-    import ipdb; ipdb.set_trace()
-    read_writer.set_password(tt, password=password, acknowledge=ack, auth_from=testpage)
+    # import ipdb; ipdb.set_trace()
+    # read_writer.set_password(tt, password=password, acknowledge=ack, auth_from=testpage)
 
-    read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
+    # read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
 
-    try:
-        read_writer.authenticate(password=password, acknowledge=ack)
+    read_writer.authenticate(password=password, acknowledge=ack)
 
-        read_writer.write_page(testpage, bytes([0xaa, 0xaa, 0xaa, 0xaa]))  # After authenticating ourselves, its writeable again
-    except: pass
+    read_writer.write_page(testpage, bytes([0xaa, 0xaa, 0xaa, 0xaa]))  # After authenticating ourselves, its writeable again
 
     print(read_writer.read_user_memory(tag_type=tt))
 
