@@ -353,8 +353,9 @@ if __name__ == "__main__":
     # 2: This is verified by reading the data again
     #
     # 3: Then, we set a password, after which we close the connection so make sure we start over with the tag in its idle state
+    # 3a: Check that we can still read
     #
-    # 4: Without authenticating with this password, we try writing again. This should fail, as we are not authenticated
+    # 4: Without authenticating with the password, we try writing again. This should fail, as we are not authenticated
     # 5: We verify that the write was unsuccessful: the page should still have its old content
     #
     # 6: We authenticate ourselves
@@ -395,6 +396,15 @@ if __name__ == "__main__":
     # uids = read_writer.list_targets()
     # read_writer.setup_target()
     # read_writer.set_easy_framing()
+
+    # 3a
+    try:
+        current_test_content = read_writer.read_page(testpage)
+        if current_test_content != bytes([0xff, 0xff, 0xff, 0xff]):
+            print("ERROR 3b: The test page was changed after setting password but before writing")
+    except OSError as e:
+        print("ERROR 3b: Could not read test page after setting password: {err}".format(err=e))
+        exit()
 
     # 4
     try:
