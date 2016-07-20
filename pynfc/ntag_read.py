@@ -317,8 +317,8 @@ class NTagReadWrite(object):
         self.write_page(cfg1_page, cfg1)
         self.write_page(cfg0_page, cfg0)
 
-
     def close(self):
+        nfc.nfc_idle(self.device)
         nfc.nfc_close(self.device)
         nfc.nfc_exit(self.context)
 
@@ -335,34 +335,115 @@ if __name__ == "__main__":
     tt = TagType.NTAG_216
     testpage = 200  # Must be available on the chosen tag type.
 
+    password = bytes([1, 2, 3, 4])
+    ack = bytes([0xaa, 0xaa])
+
+
     uid = read_writer.setup_target()
     print("uid = {}".format(binascii.hexlify(uid)))
 
     read_writer.set_easy_framing()
 
-    # read_writer.write_page(41, bytes([0b0000000, 0b00000000, 0b00000000, 0xFF]))  # Disable ascii UID mirroring
-    # read_writer.write_user_memory(self.device, bytes([0x00] * 4 * 100), TagType.NTAG_213.value)
-    # read_writer.write_page(self.device, 4, bytes([0xff,0xff,0xff,0xff]))
-    # read_writer.write_page(self.device, 5, bytes([0xff,0xff,0xff,0xff]))
 
+    # Below, we'll test and demonstrate the behavior of password protection against writing
+    # The tag is supposed to start with no password protection configured, as the factory default is.
+    # This is also how the tag should end, eventually
+    #
+    # 1: The test starts by writing to a page, which should be OK because there is not password protection.
+    # 2: This is verified by reading the data again
+    #
+    # 3: Then, we set a password, after which we close the connection so make sure we start over with the tag in its idle state
+    #
+    # 4: Without authenticating with this password, we try writing again. This should fail, as we are not authenticated
+    # 5: We verify that the write was unsuccessful: the page should still have its old content
+    #
+    # 6: We authenticate ourselves
+    #
+    # 7: And try to write again, which should be allowed since we are now authenticated
+    # 8: Again, this is verified
+    #
+    # 9: Lastly, we clear the password and the protection to their default states, so the test is repeatable.
 
-    read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # Now, this page is writable
+    # 1
+    try:
+        read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # With no password set, this page is writable
+    except OSError as e:
+        print("ERROR 1: Could not write test page: {err}".format(err=e))
+        exit()
 
-    print(read_writer.read_user_memory(tag_type=tt))
+    # 2
+    try:
+        current_test_content = read_writer.read_page(testpage)
+        if current_test_content != bytes([0xff,0xff,0xff,0xff]):
+            print("ERROR: The test page was not written")
+    except OSError as e:
+        print("ERROR 2: Could not read test page: {err}".format(err=e))
+        exit()
 
-    password = bytes([1, 2, 3, 4])
-    ack = bytes([0xaa, 0xaa])
+    # 3
+    try:
+        read_writer.set_password(tt, password=password, acknowledge=ack, auth_from=testpage)
+    except OSError as e:
+        print("ERROR 3: Could not set a password")
 
-    read_writer.set_password(tt, password=password, acknowledge=ack, auth_from=testpage)
+    # Close this connection, so we definitely need to re-authenticate
+    # # import ipdb; ipdb.set_trace()
+    # read_writer.close()
+    # del read_writer
+    #
+    # read_writer = NTagReadWrite(logger)
+    # uids = read_writer.list_targets()
+    # read_writer.setup_target()
+    # read_writer.set_easy_framing()
 
-    read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
+    # 4
+    try:
+        read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
+    except OSError as e:
+        print("OK: Could (correctly) not write test page, because we just set a password and now this page is password locked: {err}".format(err=e))
 
-    read_writer.authenticate(password=password, acknowledge=ack)
+    # 5
+    try:
+        current_test_content = read_writer.read_page(testpage)
+        if current_test_content != bytes([0xff, 0xff, 0xff, 0xff]):
+            print("ERROR 5: The test page was changed while password protected and not authenticated")
+            if current_test_content == bytes([0x00,0x00,0x00,0x00]):
+                print("\tThe test page was overwritten with what we wrote without authentication")
+        else:
+            print("OK: the test page could not be written after a password was required and not authenticated")
+    except OSError as e:
+        print("ERROR 5: Could not read test page: {err}".format(err=e))
+        exit()
 
-    read_writer.write_page(testpage, bytes([0xaa, 0xaa, 0xaa, 0xaa]))  # After authenticating ourselves, its writeable again
+    # 6
+    try:
+        read_writer.authenticate(password=password, acknowledge=ack)
+    except OSError as e:
+        print("ERROR 6: Could not authenticate: {err}".format(err=e))
 
-    print(read_writer.read_user_memory(tag_type=tt))
+    # 7
+    try:
+        read_writer.write_page(testpage, bytes([0xaa, 0xaa, 0xaa, 0xaa]))  # After authenticating ourselves, its writeable again
+    except OSError as e:
+        print("ERROR 7: Could not write test page: {err}".format(err=e))
 
-    read_writer.set_password(tt)  # Default arguments set to default state, clearing the password
+    # 8
+    try:
+        current_test_content = read_writer.read_page(testpage)
+        if current_test_content != bytes([0xaa, 0xaa, 0xaa, 0xaa]):
+            print("ERROR 8: The test page was not written after authentication")
+    except OSError as e:
+        print("ERROR 8: Could not read test page: {err}".format(err=e))
+        exit()
 
+    # 9
+    try:
+        read_writer.set_password(tt)  # Default arguments set to default state, clearing the password
+    except OSError as e:
+        print("ERROR 9: Could not clear password")
+
+    # import ipdb; ipdb.set_trace()
     read_writer.close()
+    del read_writer
+
+    print("Test completed")
