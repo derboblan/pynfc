@@ -49,6 +49,8 @@ class NTagReadWrite(object):
         self.open()
 
     def open(self):
+        """Open a connection with an NTag. Initializes pynfc context, the device.
+        Call this after a close()"""
         try:
             self.context = ctypes.pointer(nfc.nfc_context())
             self.log("Created NFC library context")
@@ -321,6 +323,8 @@ class NTagReadWrite(object):
         self.write_page(cfg0_page, cfg0)
 
     def close(self):
+        """Close connection to the target NTag and de-initialize the pynfc context.
+        After a failed read/write due to password protection, call close(), then open() and then do the authenticate() call"""
         nfc.nfc_idle(self.device)
         nfc.nfc_close(self.device)
         nfc.nfc_exit(self.context)
