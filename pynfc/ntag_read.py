@@ -342,11 +342,6 @@ if __name__ == "__main__":
     uid = read_writer.setup_target()
     print("uid = {}".format(binascii.hexlify(uid)))
 
-    try:
-        read_writer.authenticate(password=password, acknowledge=ack)
-        read_writer.set_password(tt)
-    except: pass
-
     read_writer.set_easy_framing()
 
 
@@ -397,14 +392,14 @@ if __name__ == "__main__":
         print("ERROR 3: Could not set a password")
 
     # Close this connection, so we definitely need to re-authenticate
-    # # import ipdb; ipdb.set_trace()
-    # read_writer.close()
-    # del read_writer
-    #
-    # read_writer = NTagReadWrite(logger)
-    # uids = read_writer.list_targets()
-    # read_writer.setup_target()
-    # read_writer.set_easy_framing()
+    # import ipdb; ipdb.set_trace()
+    read_writer.close()
+    del read_writer
+
+    read_writer = NTagReadWrite(logger)
+    uids = read_writer.list_targets()
+    read_writer.setup_target()
+    read_writer.set_easy_framing()
 
     # 3a
     try:
@@ -434,7 +429,15 @@ if __name__ == "__main__":
             print("   OK 5: the test page could not be written after a password was required and not authenticated")
     except OSError as e:
         print("ERROR 5: Could not read test page: {err}".format(err=e))
-        exit()
+        # exit()
+
+    read_writer.close()
+    del read_writer
+
+    read_writer = NTagReadWrite(logger)
+    uids = read_writer.list_targets()
+    read_writer.setup_target()
+    read_writer.set_easy_framing()
 
     # 6
     try:
