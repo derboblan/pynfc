@@ -246,7 +246,7 @@ class NTagReadWrite(object):
 
         nfc.iso14443a_crc(ctypes.pointer(ctypes_key), len(password), ctypes.pointer(crc))
 
-        abttx = bytes([cmd]) + password + bytes(crc)
+        abttx = bytes([cmd]) + password
 
         recv = self.transceive_bytes(bytes(abttx), 16)
 
@@ -346,17 +346,16 @@ if __name__ == "__main__":
     # read_writer.write_page(self.device, 5, bytes([0xff,0xff,0xff,0xff]))
 
 
-    # read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # Now, this page is writable
+    read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # Now, this page is writable
 
     print(read_writer.read_user_memory(tag_type=tt))
 
     password = bytes([1, 2, 3, 4])
     ack = bytes([0xaa, 0xaa])
 
-    # import ipdb; ipdb.set_trace()
-    # read_writer.set_password(tt, password=password, acknowledge=ack, auth_from=testpage)
+    read_writer.set_password(tt, password=password, acknowledge=ack, auth_from=testpage)
 
-    # read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
+    read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
 
     read_writer.authenticate(password=password, acknowledge=ack)
 
