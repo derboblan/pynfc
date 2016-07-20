@@ -46,6 +46,9 @@ class NTagReadWrite(object):
             self.modulations[i].nmt = mods[i][0]
             self.modulations[i].nbr = mods[i][1]
 
+        self.open()
+
+    def open(self):
         try:
             self.context = ctypes.pointer(nfc.nfc_context())
             self.log("Created NFC library context")
@@ -58,7 +61,7 @@ class NTagReadWrite(object):
             self.log("{} devices found".format(devices_found))
 
             if not devices_found:
-                IOError("No devices found. "+SET_CONNSTRING)
+                IOError("No devices found. " + SET_CONNSTRING)
             else:
                 self.log("Using conn_string[0] = {} to get a device. {}".format(conn_strings[0].value, SET_CONNSTRING))
 
@@ -322,6 +325,7 @@ class NTagReadWrite(object):
         nfc.nfc_close(self.device)
         nfc.nfc_exit(self.context)
 
+
 if __name__ == "__main__":
     logger = print  # logging.getLogger("ntag_read").info
 
@@ -391,15 +395,12 @@ if __name__ == "__main__":
     except OSError as e:
         print("ERROR 3: Could not set a password")
 
-    # Close this connection, so we definitely need to re-authenticate
-    # import ipdb; ipdb.set_trace()
+    # Close and reopen this connection, so we definitely need to re-authenticate
     read_writer.close()
-    del read_writer
 
-    read_writer = NTagReadWrite(logger)
-    uids = read_writer.list_targets()
+    read_writer.open()
+
     read_writer.setup_target()
-    read_writer.set_easy_framing()
 
     # 3a
     try:
@@ -431,13 +432,12 @@ if __name__ == "__main__":
         print("ERROR 5: Could not read test page: {err}".format(err=e))
         # exit()
 
+    # Close and reopen this connection, so we definitely need to re-authenticate
     read_writer.close()
-    del read_writer
 
-    read_writer = NTagReadWrite(logger)
-    uids = read_writer.list_targets()
+    read_writer.open()
+
     read_writer.setup_target()
-    read_writer.set_easy_framing()
 
     # 6
     try:
