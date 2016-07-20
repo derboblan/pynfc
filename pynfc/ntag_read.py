@@ -342,7 +342,13 @@ if __name__ == "__main__":
     uid = read_writer.setup_target()
     print("uid = {}".format(binascii.hexlify(uid)))
 
+    try:
+        read_writer.authenticate(password=password, acknowledge=ack)
+        read_writer.set_password(tt)
+    except: pass
+
     read_writer.set_easy_framing()
+
 
 
     # Below, we'll test and demonstrate the behavior of password protection against writing
@@ -368,6 +374,7 @@ if __name__ == "__main__":
     # 1
     try:
         read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # With no password set, this page is writable
+        print("   OK 1: Can write page when no password set")
     except OSError as e:
         print("ERROR 1: Could not write test page: {err}".format(err=e))
         exit()
@@ -377,6 +384,7 @@ if __name__ == "__main__":
         current_test_content = read_writer.read_page(testpage)
         if current_test_content != bytes([0xff,0xff,0xff,0xff]):
             print("ERROR: The test page was not written")
+        print("   OK 2: Can read page when no password set")
     except OSError as e:
         print("ERROR 2: Could not read test page: {err}".format(err=e))
         exit()
@@ -384,6 +392,7 @@ if __name__ == "__main__":
     # 3
     try:
         read_writer.set_password(tt, password=password, acknowledge=ack, auth_from=testpage)
+        print("   OK 3: password protection set")
     except OSError as e:
         print("ERROR 3: Could not set a password")
 
@@ -402,6 +411,8 @@ if __name__ == "__main__":
         current_test_content = read_writer.read_page(testpage)
         if current_test_content != bytes([0xff, 0xff, 0xff, 0xff]):
             print("ERROR 3b: The test page was changed after setting password but before writing")
+        print("   OK 3b: Can read page after setting password")
+
     except OSError as e:
         print("ERROR 3b: Could not read test page after setting password: {err}".format(err=e))
         exit()
@@ -410,7 +421,7 @@ if __name__ == "__main__":
     try:
         read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
     except OSError as e:
-        print("OK: Could (correctly) not write test page, because we just set a password and now this page is password locked: {err}".format(err=e))
+        print("   OK 4: Could (correctly) not write test page, because we just set a password and now this page is password locked: {err}".format(err=e))
 
     # 5
     try:
@@ -420,7 +431,7 @@ if __name__ == "__main__":
             if current_test_content == bytes([0x00,0x00,0x00,0x00]):
                 print("\tThe test page was overwritten with what we wrote without authentication")
         else:
-            print("OK: the test page could not be written after a password was required and not authenticated")
+            print("   OK 5: the test page could not be written after a password was required and not authenticated")
     except OSError as e:
         print("ERROR 5: Could not read test page: {err}".format(err=e))
         exit()
@@ -428,12 +439,14 @@ if __name__ == "__main__":
     # 6
     try:
         read_writer.authenticate(password=password, acknowledge=ack)
+        print("   OK 6: authentication successful")
     except OSError as e:
         print("ERROR 6: Could not authenticate: {err}".format(err=e))
 
     # 7
     try:
         read_writer.write_page(testpage, bytes([0xaa, 0xaa, 0xaa, 0xaa]))  # After authenticating ourselves, its writeable again
+        print("   OK 7: write after authentication successful")
     except OSError as e:
         print("ERROR 7: Could not write test page: {err}".format(err=e))
 
@@ -442,6 +455,7 @@ if __name__ == "__main__":
         current_test_content = read_writer.read_page(testpage)
         if current_test_content != bytes([0xaa, 0xaa, 0xaa, 0xaa]):
             print("ERROR 8: The test page was not written after authentication")
+        print("   OK 8: read after writing with authentication successful")
     except OSError as e:
         print("ERROR 8: Could not read test page: {err}".format(err=e))
         exit()
@@ -449,6 +463,7 @@ if __name__ == "__main__":
     # 9
     try:
         read_writer.set_password(tt)  # Default arguments set to default state, clearing the password
+        print("   OK 9: password cleared")
     except OSError as e:
         print("ERROR 9: Could not clear password")
 
