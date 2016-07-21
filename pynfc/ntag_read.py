@@ -257,6 +257,43 @@ class NTagReadWrite(object):
 
         return recv == acknowledge
 
+    def enable_uid_mirror(self, tag_type, page, byte_in_page):
+        """
+        An NTAG 21x has the option to mirror its UID to a place in the user memory.
+        This can be useful for signatures, which can then sign over something unique tied to the tag.
+
+        The mirror configuration page consists of 4 bytes:
+        - CFG0: MIRROR, rfui, MIRROR_PAGE, AUTH0
+
+        The MIRROR-byte consists of some bitfields:
+        - 7,6: MIRROR_CONF: Set to 01 for UID ASCII Mirror
+        - 5,4: MIRROR_BYTE: The 2 bits define the byte position within the page defined by the MIRROR_PAGE byte (beginning of ASCII mirror)
+        - 3  : RFUI
+        - 2  : STRG_MOD_EN: STRG MOD_EN defines the modulation mode. 0 disables, 1 enables
+        - 1,0: RFUI
+
+        The AUTH0-byte defines the page address from which the password verification is required.
+        This is set through the set_password-method.
+
+        :param tag_type: Which type of tag are we dealing with? Used to figure out where the config pages are
+        :param page: On which page must the UID be mirrored?
+        :type page int
+        :param byte_in_page: On which byte in that page must the UID be mirrored.
+         :type byte_in_page int
+        :return:
+        """
+        cfg0_page = tag_type.value['user_memory_end'] + 2
+        cfg0_orig = self.read_page(cfg0_page)
+
+
+        mirror = 0b01000000
+        mirror |= (byte_in_page) << 4
+
+        #       MIRROR  rfui        MIRROR_PAGE AUTH0
+        cfg0 = [mirror, 0b00000000, page,       cfg0_orig[3]]
+
+        self.write_page(cfg0_page, cfg0)
+
     def set_password(self, tag_type, password=b'\xff\xff\xff\xff', acknowledge=b'\x00\x00', max_attempts=None,
                      also_read=False, auth_from=0xFF, lock_config=False, enable_counter=False, protect_counter=False):
         """
