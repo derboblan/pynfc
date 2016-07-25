@@ -5,7 +5,7 @@ Requirements
 ------------
 
 libnfc >= 1.7.0
-python >= 2.6 < 3.0
+python > 3.5 (tested with 3.5)
 
 Building
 --------
@@ -15,10 +15,11 @@ The bindings are constructed at runtime using ctypes.  Just ensure the library i
 Examples
 --------
 
+###Mifareauth
+
 There is an example program included for conducting simple mifare authentication:
 
 python mifareauth.py
-
 Example output (bulk of the raw hex excised for space):
 
 Connect to reader: True
@@ -36,6 +37,14 @@ T -> R: CA 9E 73 93
 
 This indicates that it successfully authenticated to the requested block.
 
+### NTags
+```bash
+python ntag_read.py
+```
+
+This will test whether can do password protection and remove the password alltogether in the end. 
+
+
 Documentation
 -------------
 
@@ -48,3 +57,4 @@ As much as possible all libnfc commands are mirrored in the created nfc object.
 Please note whilst this does implement the full range of features found in libnfc, their use in python may be difficult or tricky to use.
 Pynfc requires much more development and time dedicated to it, before it will be useful as a production tool.
 
+The NTagReadWrite class offers a more Pythonic and high-level interface, geared towards NXP NTags 213, 215 and 216 but should be extendable/generalized to other tag types as well. 
