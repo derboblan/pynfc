@@ -25,6 +25,10 @@ class Commands(enum.Enum):
     MC_READ_SIG = 0x3c
 
 
+class NTagInfo(object):
+    BYTES_PER_PAGE = 4
+
+
 class NTagReadWrite(object):
     """
     Allows to read/write to an NTag 21x device.
@@ -152,7 +156,7 @@ class NTagReadWrite(object):
     def read_page(self, page):
         """Read the bytes at the given page"""
         received_data = self.transceive_bytes(bytes([int(Commands.MC_READ.value), page]), 16)
-        data = received_data[:4]  # Only the first 4 bytes as a page is 4 bytes
+        data = received_data[:NTagInfo.BYTES_PER_PAGE]  # Only the first 4 bytes as a page is 4 bytes
         return data
 
     def read_user_memory(self, tag_type):
@@ -188,7 +192,7 @@ class NTagReadWrite(object):
     def write_page(self, page, data, debug=False):
         if debug:
             print("Write page {:3}: {}".format(page, data))
-        if len(data) > 4:
+        if len(data) > NTagInfo.BYTES_PER_PAGE:
             raise ValueError( "Data value to be written cannot be more than 4 bytes.")
         return self.write_block(page, data)
 
@@ -200,7 +204,7 @@ class NTagReadWrite(object):
         end = tag_type.value['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
         mem_size = (end-start)
 
-        page_contents = [data[i:i+4] for i in range(0, len(data), 4)]
+        page_contents = [data[i:i+NTagInfo.BYTES_PER_PAGE] for i in range(0, len(data), NTagInfo.BYTES_PER_PAGE)]
         content_size = len(page_contents)
 
         if content_size > mem_size:
