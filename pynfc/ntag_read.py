@@ -298,6 +298,28 @@ class NTagReadWrite(object):
 
         self.write_page(cfg0_page, cfg0)
 
+    def check_uid_mirror(self, tag_type):
+        """Return to which page and byte_in_page the UID mirroring is configured.
+        If it is not enabled, return None
+
+        :param tag_type: Which type of tag are we dealing with? Used to figure out where the config pages are
+        :returns tuple (mirror_page, byte_in_page) in case UID mirroring is enabled, None if not enabled."""
+        cfg0_page = tag_type.value['user_memory_end'] + 2
+
+        config_page = self.read_page(cfg0_page)
+        mirror, _, mirror_page, auth0 = config_page
+
+        mirroring_enabled = mirror & 0b01000000 > 0
+
+        mirror_byte_mask = 0b00110000
+        byte_in_page = (mirror & mirror_byte_mask) >> 4
+
+        if mirroring_enabled:
+            return mirror_page, byte_in_page
+        else:
+            return None
+
+
     def set_password(self, tag_type, password=b'\xff\xff\xff\xff', acknowledge=b'\x00\x00', max_attempts=None,
                      also_read=False, auth_from=0xFF, lock_config=False, enable_counter=False, protect_counter=False):
         """
