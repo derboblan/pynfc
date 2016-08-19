@@ -6,10 +6,25 @@ import binascii
 import enum
 import logging
 
+def bin(i):
+    return "0b{0:08b}".format(i)
+
 class TagType(enum.Enum):
     NTAG_213 = {"user_memory_start": 4, "user_memory_end": 39}  # 4 is the first page of the user memory, 39 is the last
     NTAG_215 = {"user_memory_start": 4, "user_memory_end": 129}  # 4 is the first page of the user memory, 129 is the last
     NTAG_216 = {"user_memory_start": 4, "user_memory_end": 225}  # 4 is the first page of the user memory, 255 is the last
+
+capability_byte_type_map = {0x12: TagType.NTAG_213,
+                            0x3e: TagType.NTAG_215,
+                            0x6D: TagType.NTAG_216}
+
+
+class UnknownTagTypeException(Exception):
+    def __init__(self, message, capability_byte):
+        super(UnknownTagTypeException, self).__init__(message)
+
+        self.capability_byte = capability_byte
+
 
 SET_CONNSTRING = 'You may need to $ export LIBNFC_DEFAULT_DEVICE="pn532_uart:/dev/ttyUSB0" ' \
                  'or edit /etc/nfc/libnfc.conf and set device.connstring in case of a failure'
@@ -158,6 +173,36 @@ class NTagReadWrite(object):
         received_data = self.transceive_bytes(bytes([int(Commands.MC_READ.value), page]), 16)
         data = received_data[:NTagInfo.BYTES_PER_PAGE]  # Only the first 4 bytes as a page is 4 bytes
         return data
+
+    def determine_tag_type(self):
+        """
+        According to the NTAG213/215/216 specification, the Capability Container byte 2 contains the memory size of the tag
+        This is written during tag production. The capability Container is on page 3
+        The exact definitions are stated in table 4 of the datasheet:
+
+        Table 4. NDEF memory size
+        IC      | Value in byte 2 | NDEF memory size
+        --------+-----------------+-----------------
+        NTAG213 | 12h             | 144 byte
+        NTAG215 | 3Eh             | 496 byte
+        NTAG216 | 6Dh             | 872 byte
+        """
+        uid = self.setup_target()
+
+        self.set_easy_framing()
+
+        capability_container = self.read_page(3)
+        capability_byte = capability_container[2]
+
+        try:
+            tag_type = capability_byte_type_map[capability_byte]
+
+            return tag_type, uid
+        except KeyError as key_error:
+            raise UnknownTagTypeException("Tag has capability byte value {byte}, "
+                                          "which is unknown. Known keys are {keys}".format(byte=capability_byte,
+                                                                                           keys=list(capability_byte_type_map.keys())),
+                                          capability_byte)
 
     def read_user_memory(self, tag_type):
         """Read the complete user memory, ie. the actual content of the tag.
