@@ -9,7 +9,7 @@ import logging
 def bin(i):
     return "0b{0:08b}".format(i)
 
-class TagType(enum.Enum):
+class TagType(object):
     NTAG_213 = {"user_memory_start": 4, "user_memory_end": 39}  # 4 is the first page of the user memory, 39 is the last
     NTAG_215 = {"user_memory_start": 4, "user_memory_end": 129}  # 4 is the first page of the user memory, 129 is the last
     NTAG_216 = {"user_memory_start": 4, "user_memory_end": 225}  # 4 is the first page of the user memory, 255 is the last
@@ -204,8 +204,8 @@ class NTagReadWrite(object):
     def read_user_memory(self, tag_type):
         """Read the complete user memory, ie. the actual content of the tag.
         Configuration bytes surrounding the user memory is omitted"""
-        start = tag_type.value['user_memory_start']
-        end = tag_type.value['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+        start = tag_type['user_memory_start']
+        end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
 
         user_memory = []
         for page in range(start, end):
@@ -242,8 +242,8 @@ class NTagReadWrite(object):
         """Read the complete user memory, ie. the actual content of the tag.
         Configuration bytes surrounding the user memory are omitted, given the correct tag type.
         Otherwise, we cannot know where user memory start and ends"""
-        start = tag_type.value['user_memory_start']
-        end = tag_type.value['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+        start = tag_type['user_memory_start']
+        end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
         mem_size = (end-start)
 
         page_contents = [data[i:i+NTagInfo.BYTES_PER_PAGE] for i in range(0, len(data), NTagInfo.BYTES_PER_PAGE)]
@@ -328,7 +328,7 @@ class NTagReadWrite(object):
          :type byte_in_page int
         :return:
         """
-        cfg0_page = tag_type.value['user_memory_end'] + 2
+        cfg0_page = tag_type['user_memory_end'] + 2
         cfg0_orig = self.read_page(cfg0_page)
 
 
@@ -346,7 +346,7 @@ class NTagReadWrite(object):
 
         :param tag_type: Which type of tag are we dealing with? Used to figure out where the config pages are
         :returns tuple (mirror_page, byte_in_page) in case UID mirroring is enabled, None if not enabled."""
-        cfg0_page = tag_type.value['user_memory_end'] + 2
+        cfg0_page = tag_type['user_memory_end'] + 2
 
         config_page = self.read_page(cfg0_page)
         mirror, _, mirror_page, auth0 = config_page
@@ -384,7 +384,7 @@ class NTagReadWrite(object):
         The password must thus protect writing only, but for the whole tag so the start page in AUTH0 must be 0
         There's no need to lock the user configuration (i.e. these bytes generated here), so CGFLCK=0
         """
-        cfg0_page = tag_type.value['user_memory_end'] + 2
+        cfg0_page = tag_type['user_memory_end'] + 2
         cfg1_page = cfg0_page + 1
         pwd_page = cfg1_page + 1
         pack_page = pwd_page + 1
