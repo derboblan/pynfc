@@ -51,13 +51,10 @@ class NTagReadWrite(object):
     """
     card_timeout = 10
 
-    def __init__(self, logger=None):
+    def __init__(self, logger=logging.getLogger("ntag_read_write")):
         """Initialize a ReadWrite object
-        :param logger: function to be called as logging. Can be import logging; logging.getLogger("ntag_read").info or simply the builtin print function.
-        Defaults to no logging"""
-        def nolog(log):
-            pass
-        self.log = logger if logger else nolog
+        :param logger: logging.Logger"""
+        self.logger = logger
 
         mods = [(nfc.NMT_ISO14443A, nfc.NBR_106)]
         self.modulations = (nfc.nfc_modulation * len(mods))()
@@ -72,24 +69,24 @@ class NTagReadWrite(object):
         Call this after a close()"""
         try:
             self.context = ctypes.pointer(nfc.nfc_context())
-            self.log("Created NFC library context")
+            self.logger.info("Created NFC library context")
             nfc.nfc_init(ctypes.byref(self.context))
-            self.log("Initializing NFC library")
+            self.logger.info("Initializing NFC library")
 
             conn_strings = (nfc.nfc_connstring * 10)()
             devices_found = nfc.nfc_list_devices(self.context, conn_strings, 10)
             # import ipdb; ipdb.set_trace()
-            self.log("{} devices found".format(devices_found))
+            self.logger.info("{} devices found".format(devices_found))
 
             if not devices_found:
                 IOError("No devices found. " + SET_CONNSTRING)
             else:
-                self.log("Using conn_string[0] = {} to get a device. {}".format(conn_strings[0].value, SET_CONNSTRING))
+                self.logger.info("Using conn_string[0] = {} to get a device. {}".format(conn_strings[0].value, SET_CONNSTRING))
 
             self.device = nfc.nfc_open(self.context, conn_strings[0])
-            self.log("Opened device {}, initializing NFC initiator".format(self.device))
+            self.logger.info("Opened device {}, initializing NFC initiator".format(self.device))
             _ = nfc.nfc_initiator_init(self.device)
-            self.log("NFC initiator initialized")
+            self.logger.info("NFC initiator initialized")
         except IOError as error:
             IOError(SET_CONNSTRING)
 
@@ -256,7 +253,7 @@ class NTagReadWrite(object):
             raise ValueError("{type} user memory ({mem_size} 4-byte pages) too small for content ({content_size} 4-byte pages)".
                              format(type=tag_type, mem_size=mem_size, content_size=content_size))
 
-        self.log("Writing {} pages".format(len(page_contents)))
+        self.logger.info("Writing {} pages".format(len(page_contents)))
         for page, content in zip(range(start, end), page_contents):
             self.write_page(page, content, debug)
 
@@ -439,7 +436,7 @@ class NTagReadWrite(object):
 
 
 if __name__ == "__main__":
-    logger = print  # logging.getLogger("ntag_read").info
+    logger = logging.getLogger("ntag_read_write")
 
     read_writer = NTagReadWrite(logger)
 
