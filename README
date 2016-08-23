@@ -5,7 +5,7 @@ Requirements
 ------------
 
 libnfc >= 1.7.0
-python > 3.5 (tested with 3.5)
+python >= 2.6 < 3.0 (tested with 2.7 and 3.5)
 
 Building
 --------
@@ -39,10 +39,10 @@ This indicates that it successfully authenticated to the requested block.
 
 ### NTags
 ```bash
-python ntag_read.py
+python -m pynfc.ntag_read
 ```
 
-This will test whether can do password protection and remove the password alltogether in the end. 
+This will test whether can do password protection and remove the password all together in the end.
 
 
 Documentation

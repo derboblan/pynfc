@@ -5,6 +5,7 @@ import ctypes
 import binascii
 import enum
 import logging
+from builtins import bytes
 
 def bin(i):
     return "0b{0:08b}".format(i)

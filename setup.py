@@ -29,5 +29,6 @@ setup(
     data_files = [('examples', ['pynfc/mifareauth.py', 'pynfc/ntag_read.py'])],
     license = "GPL-2",
     packages=['pynfc'],
+    requires=['future']
 )
 
