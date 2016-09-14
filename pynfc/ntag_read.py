@@ -6,6 +6,7 @@ import binascii
 import enum
 import logging
 from builtins import bytes
+import math
 
 def bin(i):
     return "0b{0:08b}".format(i)
@@ -214,6 +215,27 @@ class NTagReadWrite(object):
 
         return bytes(user_memory)
 
+    def read_ndef_message_bytes(self, tag_type):
+        first_page = self.read_page(tag_type["user_memory_start"])
+        tag_field = first_page[0]
+
+        # 0x03 indicates NDEF message. See NFC Forum spec "Type 2 Tag Operation Specification" table 2 for others
+        if tag_field == 0x03:
+            length_format = first_page[1]
+            if length_format == 0xFF:
+                length = int.from_bytes(first_page[2:4], byteorder='big')
+            else:
+                length = length_format
+
+            user_memory = []
+            start = tag_type["user_memory_start"] + 1
+            end = tag_type["user_memory_start"] + 1 + math.ceil(length/4)
+            for page in range(start, end):
+                user_memory += list(self.read_page(page))
+            return bytes(user_memory)
+        else:
+            raise ValueError("Tag does not contain NDEF message. Tag indicates {tag} in first byte".format(tag=tag_field))
+
     def write_block(self, block, data):
         """Writes a block of data to an NTag
         Raises an exception on error
@@ -257,6 +279,40 @@ class NTagReadWrite(object):
         self.logger.info("Writing {} pages".format(len(page_contents)))
         for page, content in zip(range(start, end), page_contents):
             self.write_page(page, content, debug)
+
+    @staticmethod
+    def _make_tag_length_header_for_value(data):
+        """Any value written to a NFC Forum Type 2 Tag (which NTag's are),
+        needs to be packed in a TLV structure of 3 fields, indicating Tag (type), Length, Value
+        - The Tag-field will indicate those bytes must be interpreted as an NDEF message.
+        - The Length is simply the number of message-bytes.
+        - The Value will be the bytes of the message, in case of an NDEF message.
+
+        There are various Tags possible, value 0x03 indicates an NDEF message.
+        See Table 2 of the NFC Forum spec "Type 2 Tag Operation Specification", NFCForum-TS-Type-2-Tag_1.1
+        for the other tag values.
+
+        The lengths can be in 2 formats: one byte and three consecutive bytes.
+        -   One byte is for length between 0x00 and 0xFE length
+        -   Three consecutive bytes is for lengths between 0x00FF and 0xFFFE.
+            The first byte of the length-field is then set to 0xFF
+        """
+        tag = 0x03  # NDEF message
+
+        length = len(data)
+        if length <= 0xFE:
+            return bytes([tag, length])
+        elif length <= 0xFFFE:
+            length_bytes = length.to_bytes(2, byteorder='big')
+            return bytes([tag, 0xFF]) + length_bytes
+        else:
+            raise ValueError("Length {len} of data cannot be encoded according to "
+                             "NFC Forum spec 'Type 2 Tag Operation Specification'".format(len=length))
+
+    def write_ndef_message_bytes(self, message_bytes, *args, **kwargs):
+        tag_content = self._make_tag_length_header_for_value(message_bytes) + message_bytes
+
+        self.write_user_memory(tag_content, *args, **kwargs)
 
     def authenticate(self, password, acknowledge=b'\x00\x00'):
         """After issuing this command correctly, the tag goes into the Authenticated-state,
@@ -361,7 +417,6 @@ class NTagReadWrite(object):
             return mirror_page, byte_in_page
         else:
             return None
-
 
     def set_password(self, tag_type, password=b'\xff\xff\xff\xff', acknowledge=b'\x00\x00', max_attempts=None,
                      also_read=False, auth_from=0xFF, lock_config=False, enable_counter=False, protect_counter=False):
