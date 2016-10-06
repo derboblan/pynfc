@@ -13,8 +13,8 @@ def bin(i):
 
 class TagType(object):
     NTAG_213 = {"name":"NTAG_213", "user_memory_start": 4, "user_memory_end": 39}  # 4 is the first page of the user memory, 39 is the last
-    NTAG_215 = {"name":"NTAG_213", "user_memory_start": 4, "user_memory_end": 129}  # 4 is the first page of the user memory, 129 is the last
-    NTAG_216 = {"name":"NTAG_213", "user_memory_start": 4, "user_memory_end": 225}  # 4 is the first page of the user memory, 255 is the last
+    NTAG_215 = {"name":"NTAG_215", "user_memory_start": 4, "user_memory_end": 129}  # 4 is the first page of the user memory, 129 is the last
+    NTAG_216 = {"name":"NTAG_216", "user_memory_start": 4, "user_memory_end": 225}  # 4 is the first page of the user memory, 255 is the last
 
 capability_byte_type_map = {0x12: TagType.NTAG_213,
                             0x3e: TagType.NTAG_215,
