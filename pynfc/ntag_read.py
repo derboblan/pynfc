@@ -109,6 +109,17 @@ class NTagReadWrite(object):
 
         return uids
 
+    def count_targets(self):
+        """
+        Count the amount of targets near the device
+        :return: number of targets near
+        """
+        nt = nfc.nfc_target()
+
+        count = nfc.nfc_initiator_poll_target(self.device, self.modulations, len(self.modulations), 1, 1, ctypes.byref(nt))
+
+        return max(count, 0) # Count goes to -90 if there are no targets somehow
+
     def setup_target(self):
         """
         Find a target if there is one and returns the target's UID
