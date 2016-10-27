@@ -69,28 +69,32 @@ class NTagReadWrite(object):
     def open(self):
         """Open a connection with an NTag. Initializes pynfc context, the device.
         Call this after a close()"""
+        self.context = ctypes.pointer(nfc.nfc_context())
+        self.logger.info("Created NFC library context")
+        nfc.nfc_init(ctypes.byref(self.context))
+        self.logger.info("Initializing NFC library")
+
+        conn_strings = (nfc.nfc_connstring * 10)()
+        devices_found = nfc.nfc_list_devices(self.context, conn_strings, 10)
+        # import ipdb; ipdb.set_trace()
+        self.logger.info("{} devices found".format(devices_found))
+
+        if not devices_found:
+            self.logger.error("No devices found")
+            raise IOError("No devices found. " + SET_CONNSTRING)
+        else:
+            self.logger.info("Using conn_string[0] = {} to get a device. {}".format(conn_strings[0].value, SET_CONNSTRING))
+
+        self.device = nfc.nfc_open(self.context, conn_strings[0])
+
         try:
-            self.context = ctypes.pointer(nfc.nfc_context())
-            self.logger.info("Created NFC library context")
-            nfc.nfc_init(ctypes.byref(self.context))
-            self.logger.info("Initializing NFC library")
+            _ = self.device.contents  # This fails with a ValueError in case the device could not be opened
 
-            conn_strings = (nfc.nfc_connstring * 10)()
-            devices_found = nfc.nfc_list_devices(self.context, conn_strings, 10)
-            # import ipdb; ipdb.set_trace()
-            self.logger.info("{} devices found".format(devices_found))
-
-            if not devices_found:
-                IOError("No devices found. " + SET_CONNSTRING)
-            else:
-                self.logger.info("Using conn_string[0] = {} to get a device. {}".format(conn_strings[0].value, SET_CONNSTRING))
-
-            self.device = nfc.nfc_open(self.context, conn_strings[0])
             self.logger.info("Opened device {}, initializing NFC initiator".format(self.device))
             _ = nfc.nfc_initiator_init(self.device)
             self.logger.info("NFC initiator initialized")
-        except IOError as error:
-            IOError(SET_CONNSTRING)
+        except ValueError as error:
+            raise IOError("Could not open device on connstring {conn}: {err}".format(conn=conn_strings[0].value, err=error))
 
     def list_targets(self, max_targets=10):
         """
