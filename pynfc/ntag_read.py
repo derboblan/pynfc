@@ -225,10 +225,25 @@ class NTagReadWrite(object):
         end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
 
         user_memory = []
+
         for page in range(start, end):
             user_memory += list(self.read_page(page))
 
         return bytes(user_memory)
+
+    def fast_read_user_memory(self, tag_type):
+        """Read the complete user memory, ie. the actual content of the tag.
+        Configuration bytes surrounding the user memory is omitted"""
+        start_page = tag_type['user_memory_start']
+        end_page = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+
+        user_memory = []
+        for page in range(start_page, end_page, 4):
+            received_data = self.transceive_bytes(bytes([int(Commands.MC_READ.value), page]), 4*NTagInfo.BYTES_PER_PAGE)
+            data = received_data[:]  # Only the first 4 bytes as a page is 4 bytes
+            user_memory += data
+
+        return bytes(user_memory[:(end_page - start_page)*NTagInfo.BYTES_PER_PAGE])  # As we take 4 page steps, the last bytes and pages are out of range (and thus 0x00)
 
     def read_ndef_message_bytes(self, tag_type):
         first_page = self.read_page(tag_type["user_memory_start"])
@@ -506,30 +521,7 @@ class NTagReadWrite(object):
         nfc.nfc_exit(self.context)
 
 
-if __name__ == "__main__":
-    logger = logging.getLogger("ntag_read_write")
-
-    read_writer = NTagReadWrite(logger)
-
-    uids = read_writer.list_targets()
-    if len(uids) > 1:
-        print("Found {count} uids: {uids}. Please remove all but one from the device".format(count=len(uids), uids=uids))
-        exit(-1)
-
-    tt = TagType.NTAG_216
-    testpage = 200  # Must be available on the chosen tag type.
-
-    password = bytes([1, 2, 3, 4])
-    ack = bytes([0xaa, 0xaa])
-
-
-    uid = read_writer.setup_target()
-    print("uid = {}".format(binascii.hexlify(uid)))
-
-    read_writer.set_easy_framing()
-
-
-
+def test_passwords():
     # Below, we'll test and demonstrate the behavior of password protection against writing
     # The tag is supposed to start with no password protection configured, as the factory default is.
     # This is also how the tag should end, eventually
@@ -549,10 +541,9 @@ if __name__ == "__main__":
     # 8: Again, this is verified
     #
     # 9: Lastly, we clear the password and the protection to their default states, so the test is repeatable.
-
     # 1
     try:
-        read_writer.write_page(testpage, bytes([0xff,0xff,0xff,0xff])) # With no password set, this page is writable
+        read_writer.write_page(testpage, bytes([0xff, 0xff, 0xff, 0xff]))  # With no password set, this page is writable
         print("   OK 1: Can write page when no password set")
     except OSError as e:
         print("ERROR 1: Could not write test page: {err}".format(err=e))
@@ -561,7 +552,7 @@ if __name__ == "__main__":
     # 2
     try:
         current_test_content = read_writer.read_page(testpage)
-        if current_test_content != bytes([0xff,0xff,0xff,0xff]):
+        if current_test_content != bytes([0xff, 0xff, 0xff, 0xff]):
             print("ERROR: The test page was not written")
         print("   OK 2: Can read page when no password set")
     except OSError as e:
@@ -577,11 +568,8 @@ if __name__ == "__main__":
 
     # Close and reopen this connection, so we definitely need to re-authenticate
     read_writer.close()
-
     read_writer.open()
-
     read_writer.setup_target()
-
     # 3a
     try:
         current_test_content = read_writer.read_page(testpage)
@@ -595,30 +583,29 @@ if __name__ == "__main__":
 
     # 4
     try:
-        read_writer.write_page(testpage, bytes([0x00,0x00,0x00,0x00])) # After setting the password protection, the page cannot be written anymore
+        read_writer.write_page(testpage, bytes(
+            [0x00, 0x00, 0x00, 0x00]))  # After setting the password protection, the page cannot be written anymore
     except OSError as e:
-        print("   OK 4: Could (correctly) not write test page, because we just set a password and now this page is password locked: {err}".format(err=e))
+        print(
+            "   OK 4: Could (correctly) not write test page, because we just set a password and now this page is password locked: {err}".format(
+                err=e))
 
     # 5
     try:
         current_test_content = read_writer.read_page(testpage)
         if current_test_content != bytes([0xff, 0xff, 0xff, 0xff]):
             print("ERROR 5: The test page was changed while password protected and not authenticated")
-            if current_test_content == bytes([0x00,0x00,0x00,0x00]):
+            if current_test_content == bytes([0x00, 0x00, 0x00, 0x00]):
                 print("\tThe test page was overwritten with what we wrote without authentication")
         else:
             print("   OK 5: the test page could not be written after a password was required and not authenticated")
     except OSError as e:
         print("ERROR 5: Could not read test page: {err}".format(err=e))
         # exit()
-
     # Close and reopen this connection, so we definitely need to re-authenticate
     read_writer.close()
-
     read_writer.open()
-
     read_writer.setup_target()
-
     # 6
     try:
         read_writer.authenticate(password=password, acknowledge=ack)
@@ -628,7 +615,8 @@ if __name__ == "__main__":
 
     # 7
     try:
-        read_writer.write_page(testpage, bytes([0xaa, 0xaa, 0xaa, 0xaa]))  # After authenticating ourselves, its writeable again
+        read_writer.write_page(testpage,
+                               bytes([0xaa, 0xaa, 0xaa, 0xaa]))  # After authenticating ourselves, its writeable again
         print("   OK 7: write after authentication successful")
     except OSError as e:
         print("ERROR 7: Could not write test page: {err}".format(err=e))
@@ -653,5 +641,50 @@ if __name__ == "__main__":
     # import ipdb; ipdb.set_trace()
     read_writer.close()
     del read_writer
-
     print("Test completed")
+
+import time, contextlib
+@contextlib.contextmanager
+def stopwatch(label=None):
+    start = time.time()
+    yield
+    end = time.time()
+    dt = end - start
+    if label:
+        print("{} takes ".format(label), end="")
+    print(dt)
+
+
+def test_fast_read():
+    um_norm = read_writer.read_user_memory(tt)
+    um_fast = read_writer.fast_read_user_memory(tt)
+    assert um_norm in um_fast
+    assert len(um_norm) == len(um_fast)
+    assert um_norm == um_fast
+
+
+if __name__ == "__main__":
+    logger = logging.getLogger("ntag_read_write")
+
+    read_writer = NTagReadWrite(logger)
+
+    uids = read_writer.list_targets()
+    if len(uids) > 1:
+        print("Found {count} uids: {uids}. Please remove all but one from the device".format(count=len(uids), uids=uids))
+        exit(-1)
+
+    tt = TagType.NTAG_216
+    testpage = 200  # Must be available on the chosen tag type.
+
+    password = bytes([1, 2, 3, 4])
+    ack = bytes([0xaa, 0xaa])
+
+
+    uid = read_writer.setup_target()
+    print("uid = {}".format(binascii.hexlify(uid)))
+
+    read_writer.set_easy_framing()
+
+    # test_passwords()
+
+    test_fast_read()
