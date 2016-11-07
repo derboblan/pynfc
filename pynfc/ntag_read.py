@@ -225,10 +225,25 @@ class NTagReadWrite(object):
         end = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
 
         user_memory = []
+
         for page in range(start, end):
             user_memory += list(self.read_page(page))
 
         return bytes(user_memory)
+
+    def fast_read_user_memory(self, tag_type):
+        """Read the complete user memory, ie. the actual content of the tag.
+        Configuration bytes surrounding the user memory is omitted"""
+        start_page = tag_type['user_memory_start']
+        end_page = tag_type['user_memory_end'] + 1  # + 1 because the Python range generator excluded the last value
+
+        user_memory = []
+        for page in range(start_page, end_page, 4):
+            received_data = self.transceive_bytes(bytes([int(Commands.MC_READ.value), page]), 4*NTagInfo.BYTES_PER_PAGE)
+            data = received_data[:]  # Only the first 4 bytes as a page is 4 bytes
+            user_memory += data
+
+        return bytes(user_memory[:(end_page - start_page)*NTagInfo.BYTES_PER_PAGE])  # As we take 4 page steps, the last bytes and pages are out of range (and thus 0x00)
 
     def read_ndef_message_bytes(self, tag_type):
         first_page = self.read_page(tag_type["user_memory_start"])
@@ -628,6 +643,25 @@ def test_passwords():
     del read_writer
     print("Test completed")
 
+import time, contextlib
+@contextlib.contextmanager
+def stopwatch(label=None):
+    start = time.time()
+    yield
+    end = time.time()
+    dt = end - start
+    if label:
+        print("{} takes ".format(label), end="")
+    print(dt)
+
+
+def test_fast_read():
+    um_norm = read_writer.read_user_memory(tt)
+    um_fast = read_writer.fast_read_user_memory(tt)
+    assert um_norm in um_fast
+    assert len(um_norm) == len(um_fast)
+    assert um_norm == um_fast
+
 
 if __name__ == "__main__":
     logger = logging.getLogger("ntag_read_write")
@@ -651,4 +685,6 @@ if __name__ == "__main__":
 
     read_writer.set_easy_framing()
 
-    test_passwords()
+    # test_passwords()
+
+    test_fast_read()
