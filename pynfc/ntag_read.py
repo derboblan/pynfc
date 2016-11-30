@@ -5,7 +5,7 @@ import ctypes
 import binascii
 import enum
 import logging
-from builtins import bytes
+# from builtins import bytes
 import math
 
 def bin(i):
