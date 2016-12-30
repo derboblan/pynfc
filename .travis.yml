@@ -7,7 +7,7 @@ python:
 # command to install dependencies
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install -y libnfc5
+  - sudo apt-get install -y libnfc5 debhelper
 install: 
   - python3 setup.py install
   - pip install codecov
