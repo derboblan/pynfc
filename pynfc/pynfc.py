@@ -453,6 +453,7 @@ class LibraryLoader(object):
         paths = self.getpaths(libname)
 
         for path in paths:
+            print(path)
             if os.path.exists(path):
                 return self.load(path)
 
