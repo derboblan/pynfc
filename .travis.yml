@@ -11,7 +11,7 @@ before_install:
 install: 
   - python3 setup.py install
   - pip install codecov
-  - pip install stdeb
+  - sudo pip install stdeb
 # command to run tests
 script:
   - nosetests --with-coverage
