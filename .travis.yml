@@ -17,4 +17,4 @@ script:
   - nosetests --with-coverage
 after_success:
   - bash <(curl -s https://codecov.io/bash)
-  - sudo python3 setup.py --command-packages=stdeb.command bdist_deb
+  - python3 setup.py --command-packages=stdeb.command bdist_deb
