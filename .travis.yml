@@ -5,13 +5,15 @@ python:
 # command to install dependencies
 before_install:
   - sudo apt-get -qq update
-  - sudo apt-get install -y libnfc*
+  - sudo apt-get install -y libnfc5
 install: 
   - python3 setup.py install
   - pip install codecov
   - pip install stdeb
 # command to run tests
-script: 
+script:
+  - dpkg -L libnfc5
+  - ls /usr/lib/x86_64-linux-gnu | grep libnfc
   - python3 -c "from pynfc.pynfc import PosixLibraryLoader; ll = PosixLibraryLoader(); print(list(ll.getpaths('nfc')))" # Debugging travis
   - nosetests --with-coverage
 after_success:
