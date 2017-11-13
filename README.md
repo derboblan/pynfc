@@ -2,8 +2,8 @@
 
 ## Requirements
 
-libnfc >= 1.7.0
-python >= 2.6 < 3.5 (tested with 2.7 and 3.5)
+* libnfc >= 1.7.0
+* python >= 2.6 < 3.5 (tested with 2.7 and 3.5)
 
 ## Building
 
@@ -30,7 +30,8 @@ import pynfc as nfc;
 
 There is an example program included for conducting simple mifare authentication:
 
-python mifareauth.py
+```bash
+> python mifareauth.py
 Example output (bulk of the raw hex excised for space):
 
 Connect to reader: True
@@ -45,6 +46,7 @@ T -> R: A2 7F 33 EE
 TR == Next(TN, 96): True
 R -> T: 8F A4 FA D1
 T -> R: CA 9E 73 93
+```
 
 This indicates that it successfully authenticated to the requested block.
 
