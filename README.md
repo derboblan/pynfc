@@ -1,21 +1,32 @@
-Pynfc - Python bindings for libnfc
-==================================
+# Pynfc - Python bindings for libnfc
 
-Requirements
-------------
+## Requirements
 
 libnfc >= 1.7.0
 python >= 2.6 < 3.5 (tested with 2.7 and 3.5)
 
-Building
---------
+## Building
 
 The bindings are constructed at runtime using ctypes.  Just ensure the library is correctly installed.
 
-Examples
---------
+## Instalation
 
-###Mifareauth
+```
+sudo apt-get install -y libnfc5 debhelper python3-all python3-setuptools
+git clone git@github.com:ppatrik/pynfc.git
+cd pynfc
+python3 setup.py install
+```
+
+Now you can import pynfc in your projects
+
+```py
+import pynfc as nfc;
+```
+
+## Examples
+
+### Mifareauth
 
 There is an example program included for conducting simple mifare authentication:
 
@@ -45,8 +56,7 @@ python -m pynfc.ntag_read
 This will test whether can do password protection and remove the password all together in the end.
 
 
-Documentation
--------------
+## Documentation
 
 The pynfc bindings should offer an intuitive, yet pythonic way of calling the standard libnfc API.
 
