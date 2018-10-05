@@ -453,9 +453,13 @@ class LibraryLoader(object):
         paths = self.getpaths(libname)
 
         for path in paths:
-            print(path)
-            if os.path.exists(path):
-                return self.load(path)
+            handle = None
+            try:
+                handle = self.load(path)
+            except:
+                pass
+            if handle:
+                return handle
 
         raise ImportError("%s not found." % libname)
 

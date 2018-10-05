@@ -22,7 +22,7 @@ import time
 import logging
 import ctypes
 import string
-import nfc
+import pynfc as nfc
 import binascii
 
 
