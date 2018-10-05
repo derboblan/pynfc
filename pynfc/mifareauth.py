@@ -116,11 +116,8 @@ class NFCReader(object):
         elif res >= 1:
             print("_poll_loop: res = {}. nt.nti.nai.szUidLen = {}".format(res, nt.nti.nai.szUidLen))
             uid = None
-            uidLen = 7
-            if nt.nti.nai.szUidLen == uidLen:
-                # uid = "".join([chr(nt.nti.nai.abtUid[i]) for i in range(uidLen)])
-                uid = bytearray([nt.nti.nai.abtUid[i] for i in range(uidLen)])
-                print("_poll_loop: uid = {}".format(binascii.hexlify(uid)))
+            uid = bytearray([nt.nti.nai.abtUid[i] for i in range(nt.nti.nai.szUidLen)])
+            print("_poll_loop: uid = {}".format(binascii.hexlify(uid)))
             if uid:
                 if not ((self._card_uid and self._card_present and uid == self._card_uid) and
                         time.mktime(time.gmtime()) <= self._card_last_seen + self.card_timeout):
