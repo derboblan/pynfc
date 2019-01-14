@@ -1407,7 +1407,7 @@ if hasattr(_libs['nfc'], 'str_nfc_baud_rate'):
 # /usr/include/nfc/nfc.h: 141
 if hasattr(_libs['nfc'], 'str_nfc_target'):
     str_nfc_target = _libs['nfc'].str_nfc_target
-    str_nfc_target.argtypes = [POINTER(POINTER(c_char)), nfc_target, c_uint8]
+    str_nfc_target.argtypes = [POINTER(POINTER(c_char)), POINTER(nfc_target), c_uint8]
     str_nfc_target.restype = c_int
 
 # /usr/include/nfc/nfc-emulation.h: 43
